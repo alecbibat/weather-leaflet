@@ -25,20 +25,13 @@
       font-family: sans-serif;
       font-size: 13px;
     }
-    #controls {
-      top: 10px;
-      left: 10px;
-    }
+    #controls { top: 10px; left: 10px; }
     #alerts {
-      bottom: 10px;
-      left: 10px;
-      max-height: 250px;
-      width: 300px;
+      bottom: 10px; left: 10px;
+      max-height: 250px; width: 300px;
       overflow-y: auto;
     }
-    button {
-      margin-top: 5px;
-    }
+    button { margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -66,11 +59,8 @@
     }).addTo(map);
 
     // ----- Radar animation setup (1.5× speed smooth) -----
-    let radarFrames = [];
-    let radarLayers = [];
-    let currentFrameIndex = 0;
-    let animationInterval;
-    let isPlaying = true;
+    let radarFrames = [], radarLayers = [], currentFrameIndex = 0;
+    let animationInterval, isPlaying = true;
 
     function preloadRadarFrames(frames) {
       frames.forEach(frame => {
@@ -79,26 +69,19 @@
         radarLayers.push(layer);
       });
     }
-
     function showFrame(idx) {
-      radarLayers.forEach((layer, i) =>
-        layer.setOpacity(i === idx ? 0.6 : 0)
-      );
+      radarLayers.forEach((layer,i) => layer.setOpacity(i===idx?0.6:0));
     }
-
     function startAnimation() {
       animationInterval = setInterval(() => {
         showFrame(currentFrameIndex);
         currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
       }, 333);
     }
-
-    function stopAnimation() {
-      clearInterval(animationInterval);
-    }
+    function stopAnimation() { clearInterval(animationInterval); }
 
     fetch("https://api.rainviewer.com/public/weather-maps.json")
-      .then(r => r.json())
+      .then(r=>r.json())
       .then(data => {
         radarFrames = data.radar?.past || [];
         if (!radarFrames.length) return alert("No radar frames available.");
@@ -110,39 +93,49 @@
 
     document.getElementById("toggleBtn").addEventListener("click", () => {
       isPlaying = !isPlaying;
-      document.getElementById("toggleBtn").innerText = isPlaying ? "Pause" : "Play";
+      toggleBtn.innerText = isPlaying?"Pause":"Play";
       isPlaying ? startAnimation() : stopAnimation();
     });
 
     // ----- NWS alerts (last 24h) with county boundaries -----
     const alertLayerGroup = L.layerGroup().addTo(map);
-    const COUNTY_SERVICE =
-      "https://services1.arcgis.com/7DRakJXKPEhwv0fM/ArcGIS/rest/services/US_Counties/FeatureServer/0/query";
+    let countiesGeoJson = null;
+
+    // Load counties GeoJSON (feature.id = 5-digit FIPS) :contentReference[oaicite:2]{index=2}
+    fetch("https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json")
+      .then(r => r.json())
+      .then(data => {
+        countiesGeoJson = data;
+        // Once counties are ready, fetch alerts
+        fetchWeatherAlerts();
+        setInterval(fetchWeatherAlerts, 5*60*1000);
+      })
+      .catch(err => console.error("Counties load error:", err));
 
     function getAlertColor(evt) {
-      if (/tornado/i.test(evt)) return "red";
-      if (/flood/i.test(evt))   return "blue";
-      if (/wind/i.test(evt))    return "orange";
-      if (/heat|cold/i.test(evt)) return "purple";
-      if (/fire/i.test(evt))    return "darkred";
+      if (/tornado/i.test(evt))    return "red";
+      if (/flood/i.test(evt))      return "blue";
+      if (/wind/i.test(evt))       return "orange";
+      if (/heat|cold/i.test(evt))  return "purple";
+      if (/fire/i.test(evt))       return "darkred";
       return "gray";
     }
 
     function fetchWeatherAlerts() {
+      if (!countiesGeoJson) return; // wait until counties are loaded
+
       fetch("https://api.weather.gov/alerts/active")
         .then(r => r.json())
         .then(data => {
           const feed = document.getElementById("alertFeed");
-          const now = Date.now();
-          const oneDayAgo = now - 24*60*60*1000;
+          const now = Date.now(), oneDayAgo = now - 24*60*60*1000;
 
-          // Filter to alerts issued in last 24h
-          const recent = (data.features || []).filter(f => {
-            return new Date(f.properties.sent).getTime() >= oneDayAgo;
-          });
+          // Filter alerts sent in last 24h
+          const recent = (data.features||[]).filter(f =>
+            new Date(f.properties.sent).getTime() >= oneDayAgo
+          );
 
           alertLayerGroup.clearLayers();
-
           if (!recent.length) {
             feed.innerHTML = "<p>No alerts in the last 24 hours.</p>";
             return;
@@ -155,56 +148,20 @@
               <div style="margin-bottom:10px">
                 <strong>${p.event}</strong><br/>
                 <em>${p.areaDesc}</em><br/>
-                <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
+                <span style="color:gray;">${p.severity} – ${p.urgency}</span><br/>
                 <span>${p.headline}</span><br/>
                 <small>Sent: ${new Date(p.sent).toLocaleString()}</small>
               </div>
             `;
           }).join("");
 
-          // Draw each affected county by SAME/FIPS code
+          // Draw true county boundaries using SAME codes (drop leading zero for FIPS) :contentReference[oaicite:3]{index=3}
           recent.forEach(f => {
-            const sameCodes = f.properties.geocode.SAME || [];
-            sameCodes.forEach(rawCode => {
-              const fips = rawCode.length === 6 ? rawCode.slice(1) : rawCode;
-              const params = new URLSearchParams({
-                where:     `FIPS='${fips}'`,
-                outFields: '*',
-                f:         'geojson'
-              });
-              fetch(`${COUNTY_SERVICE}?${params}`)
-                .then(r => r.json())
-                .then(geojson => {
-                  L.geoJSON(geojson, {
-                    style: () => ({
-                      color: getAlertColor(f.properties.event),
-                      weight: 2,
-                      opacity: 0.8,
-                      fillOpacity: 0.1
-                    }),
-                    onEachFeature: (feature, layer) => {
-                      const p = f.properties;
-                      layer.bindPopup(`
-                        <strong>${p.event}</strong><br/>
-                        <em>${p.areaDesc}</em><br/>
-                        ${p.headline}<br/>
-                        <small>Sent: ${new Date(p.sent).toLocaleString()}</small>
-                      `);
-                    }
-                  }).addTo(alertLayerGroup);
-                })
-                .catch(err => console.error("County fetch error:", err));
-            });
-          });
-        })
-        .catch(err => {
-          console.error("Alert fetch error:", err);
-          document.getElementById("alertFeed").innerText = "Error loading alerts.";
-        });
-    }
-
-    fetchWeatherAlerts();
-    setInterval(fetchWeatherAlerts, 5*60*1000); // refresh every 5 min
-  </script>
-</body>
-</html>
+            const codes = f.properties.geocode.SAME || [];
+            const fipsList = codes.map(code => code.length===6? code.slice(1): code);
+            const features = countiesGeoJson.features.filter(feat =>
+              fipsList.includes(feat.id)
+            );
+            if (features.length) {
+              L.geoJSON(
+                { type: "FeatureCol
