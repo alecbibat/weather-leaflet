@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Radar + Active NWS Alerts with Counties</title>
+  <title>Radar + NWS Alerts + FIRMS Fire Data</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     html, body, #map {
@@ -55,17 +55,24 @@
 <script>
   const map = L.map('map').setView([37.8, -96], 5);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  const baseLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 19
   }).addTo(map);
 
-  // Radar Animation
-  let radarFrames = [];
-  let radarLayers = [];
-  let currentFrameIndex = 0;
-  let animationInterval;
-  let isPlaying = true;
+  // --- FIRMS Fire Data Layer ---
+  const FIRMS_KEY = '98816b6dadda86b7a77d0477889142db';
+  const firmsLayer = L.tileLayer.wms(`https://firms2.modaps.eosdis.nasa.gov/wms/key/${FIRMS_KEY}`, {
+    layers: 'fires_modis_24,fires_viirs_noaa20_24',
+    format: 'image/png',
+    transparent: true,
+    version: '1.1.1',
+    attribution: '&copy; NASA FIRMS'
+  }).addTo(map);
+
+  // --- RainViewer Radar Animation ---
+  let radarFrames = [], radarLayers = [], currentFrameIndex = 0;
+  let animationInterval, isPlaying = true;
 
   function startRadarAnimation() {
     animationInterval = setInterval(() => {
@@ -98,10 +105,7 @@
       let loadCount = 0;
       radarFrames.forEach((frame, i) => {
         const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-        const layer = L.tileLayer(url, {
-          opacity: 0,
-          zIndex: 10
-        });
+        const layer = L.tileLayer(url, { opacity: 0, zIndex: 10 });
 
         layer.on('load', () => {
           loadCount++;
@@ -115,7 +119,7 @@
       });
     });
 
-  // Alerts
+  // --- NWS Alert Logic ---
   const alertLayerGroup = L.layerGroup().addTo(map);
   let countyGeoJSON = null;
 
@@ -129,12 +133,12 @@
     if (e === "severe thunderstorm warning") return "orange";
     if (e === "flash flood warning") return "blue";
     if (e === "flood advisory") return "lightblue";
-    if (e === "flood warning") return "#3399cc";       // improved
+    if (e === "flood warning") return "#3399cc";
     if (e === "flood watch") return "green";
-    if (e === "heat advisory") return "#ffcc66";        // improved
+    if (e === "heat advisory") return "#ffcc66";
     if (e === "red flag warning") return "pink";
 
-    return "#999"; // fallback
+    return "#999";
   }
 
   function fetchWeatherAlerts() {
@@ -212,6 +216,13 @@
       fetchWeatherAlerts();
       setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
     });
+
+  // Optional: Layer Toggle
+  L.control.layers(null, {
+    "Radar": L.layerGroup(radarLayers),
+    "NWS Alerts": alertLayerGroup,
+    "FIRMS Fires": firmsLayer
+  }).addTo(map);
 </script>
 </body>
 </html>
