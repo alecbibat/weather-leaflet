@@ -71,11 +71,12 @@
     }
 
     function startAnimation() {
-      animationInterval = setInterval(() => {
-        showFrame(currentFrameIndex);
-        currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
-      }, 500);
-    }
+  animationInterval = setInterval(() => {
+    showFrame(currentFrameIndex);
+    currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
+  }, 333); // 1.5x faster
+}
+
 
     function stopAnimation() {
       clearInterval(animationInterval);
