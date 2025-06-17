@@ -60,9 +60,10 @@
     maxZoom: 19
   }).addTo(map);
 
-  // --- FIRMS Fire Data Layer ---
+  // --- FIRMS Fire Data Layer (correct WMS) ---
   const FIRMS_KEY = '98816b6dadda86b7a77d0477889142db';
-  const firmsLayer = L.tileLayer.wms(`https://firms2.modaps.eosdis.nasa.gov/wms/key/${FIRMS_KEY}`, {
+  const firmsLayer = L.tileLayer.wms('https://firms.modaps.eosdis.nasa.gov/wms/c6', {
+    map_key: FIRMS_KEY,
     layers: 'fires_modis_24,fires_viirs_noaa20_24',
     format: 'image/png',
     transparent: true,
@@ -217,7 +218,7 @@
       setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
     });
 
-  // Optional: Layer Toggle
+  // Layer Toggle Controls
   L.control.layers(null, {
     "Radar": L.layerGroup(radarLayers),
     "NWS Alerts": alertLayerGroup,
