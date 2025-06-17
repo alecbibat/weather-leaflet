@@ -13,15 +13,10 @@
       border-radius: 6px; font-family: sans-serif;
       font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-    #controls {
-      top: 10px; right: 10px;
-      width: 200px;
-    }
+    #controls { top: 10px; right: 10px; width: 200px; }
     #alerts {
-      top: 10px;
-      bottom: 10px;
-      left: 10px;
-      width: 300px;
+      top: 10px; left: 10px;
+      bottom: 10px; width: 300px;
       overflow-y: auto;
     }
     button, label { margin-top: 5px; display: block; }
@@ -33,7 +28,7 @@
     .leaflet-control-zoom {
       bottom: 10px !important;
       top: auto !important;
-      right: 10px;
+      right: 10px !important;
       left: auto !important;
     }
   </style>
@@ -41,7 +36,6 @@
 <body>
 
 <div id="controls">
-  <strong>Layers</strong><br>
   <label><input type="checkbox" id="toggle-radar" checked /> Radar</label>
   <label><input type="checkbox" id="toggle-alerts" checked /> NWS Alerts</label>
   <label><input type="checkbox" id="toggle-firms" /> FIRMS Fires</label>
@@ -62,7 +56,6 @@
     attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
-  // --- Radar Layer Group ---
   const radarGroup = L.layerGroup().addTo(map);
   let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
 
@@ -91,7 +84,7 @@
           loaded++;
           if (loaded === radarFrames.length) {
             radarLayers[0].setOpacity(0.6);
-            startRadar();
+            if (playing) startRadar();
           }
         });
         radarGroup.addLayer(layer);
@@ -99,7 +92,6 @@
       });
     });
 
-  // --- Radar Toggle ---
   document.getElementById('toggle-radar').addEventListener('change', e => {
     if (e.target.checked) {
       map.addLayer(radarGroup);
@@ -108,7 +100,6 @@
     }
   });
 
-  // --- NWS Alerts ---
   const alertLayerGroup = L.layerGroup().addTo(map);
   let countyGeo = null;
   const ALERT_API = "https://api.weather.gov/alerts/active";
@@ -144,13 +135,16 @@
           ? "<p>No active alerts.</p>"
           : alerts.map(f => {
               const p = f.properties;
+              const cwa = p.sender?.split('/').pop();
+              const wwa = encodeURIComponent(p.event.toLowerCase());
+              const readableURL = `https://forecast.weather.gov/wwamap/wwatxtget.php?cwa=${cwa}&wwa=${wwa}`;
               return `<div style="margin-bottom:10px">
                 <strong>${p.event}</strong><br/>
                 <em>${p.areaDesc}</em><br/>
                 <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
                 <span>${p.headline}</span><br/>
                 <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
-                <a class="alert-link" href="${p.web || p['@id']}" target="_blank">View Alert</a>
+                <a class="alert-link" href="${readableURL}" target="_blank">View Alert</a>
               </div>`;
             }).join("");
 
@@ -161,17 +155,21 @@
           const fipsList = codes.map(c => c.length === 6 ? c.slice(1) : c);
           const matchingFeatures = countyGeo.features.filter(f => fipsList.includes(f.id));
           if (matchingFeatures.length) {
+            const p = alert.properties;
+            const cwa = p.sender?.split('/').pop();
+            const wwa = encodeURIComponent(p.event.toLowerCase());
+            const readableURL = `https://forecast.weather.gov/wwamap/wwatxtget.php?cwa=${cwa}&wwa=${wwa}`;
             L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
               style: {
-                color: getAlertColor(alert.properties.event),
+                color: getAlertColor(p.event),
                 weight: 2, opacity: 0.8, fillOpacity: 0.1
               },
               onEachFeature: (feature, layer) => {
                 layer.bindPopup(`
-                  <strong>${alert.properties.event}</strong><br/>
-                  ${alert.properties.headline}<br/>
-                  <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small><br/>
-                  <a class="alert-link" href="${alert.properties.web || alert.properties['@id']}" target="_blank">View Alert</a>
+                  <strong>${p.event}</strong><br/>
+                  ${p.headline}<br/>
+                  <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
+                  <a class="alert-link" href="${readableURL}" target="_blank">View Alert</a>
                 `);
               }
             }).addTo(alertLayerGroup);
@@ -188,7 +186,6 @@
       setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
     });
 
-  // --- NWS Alerts Toggle ---
   document.getElementById('toggle-alerts').addEventListener('change', e => {
     if (e.target.checked) {
       map.addLayer(alertLayerGroup);
@@ -197,7 +194,6 @@
     }
   });
 
-  // --- FIRMS Fires Toggle ---
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
