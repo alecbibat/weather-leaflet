@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Radar + NWS Alerts + FIRMS Fires</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
     #controls, #alerts {
@@ -31,45 +30,162 @@
 <body>
 
 <div id="controls">
-  <strong>Layers</strong><br>
-  <input type="checkbox" id="firmsToggle" /> FIRMS Fires<br>
+  <strong>Radar Animation</strong><br>
   <button id="toggleBtn">Pause</button>
 </div>
 
-<div id="alerts"></div>
+<div id="alerts">
+  <strong>Live Weather Alerts (Active Only)</strong>
+  <div id="alertFeed">Loading...</div>
+</div>
 
 <div id="map"></div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  const map = L.map('map').setView([39.5, -98.35], 4);
+  const map = L.map('map').setView([37.8, -96], 5);
 
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    attribution: '© OpenStreetMap'
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
-  // FIRMS WMS Layer
-  const firmsLayer = L.tileLayer.wms("https://firms.modaps.eosdis.nasa.gov/wms/?", {
-    layers: "fires_modis_24",
-    format: "image/png",
+  // --- FIRMS Fire Layer (corrected) ---
+  const firmsLayer = L.tileLayer.wms('https://firms.modaps.eosdis.nasa.gov/wms/c6?', {
+    layers: 'fires_viirs_24',
+    format: 'image/png',
     transparent: true,
-    attribution: "NASA FIRMS"
+    version: '1.1.1',
+    attribution: '&copy; NASA FIRMS',
+    opacity: 1
   });
 
-  // Toggle checkbox
-  document.getElementById("firmsToggle").addEventListener("change", function () {
-    if (this.checked) {
-      map.addLayer(firmsLayer);
-    } else {
-      map.removeLayer(firmsLayer);
-    }
+  // --- Layer Groups ---
+  const radarGroup = L.layerGroup().addTo(map);
+  const alertLayerGroup = L.layerGroup().addTo(map);
+
+  // --- Layer Toggle Control ---
+  L.control.layers(null, {
+    'Radar': radarGroup,
+    'NWS Alerts': alertLayerGroup,
+    'FIRMS Fires': firmsLayer
+  }).addTo(map);
+
+  // --- RainViewer Radar Animation ---
+  let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
+  function startRadar() {
+    radarInterval = setInterval(() => {
+      radarLayers.forEach((layer, i) => {
+        layer.setOpacity(i === frameIndex ? 0.6 : 0);
+      });
+      frameIndex = (frameIndex + 1) % radarLayers.length;
+    }, 333);
+  }
+  function stopRadar() { clearInterval(radarInterval); }
+
+  document.getElementById("toggleBtn").addEventListener("click", () => {
+    playing = !playing;
+    document.getElementById("toggleBtn").innerText = playing ? "Pause" : "Play";
+    playing ? startRadar() : stopRadar();
   });
 
-  // Placeholder for toggleBtn functionality
-  document.getElementById("toggleBtn").addEventListener("click", function () {
-    alert("Radar toggle not implemented in this snippet.");
-  });
+  fetch("https://api.rainviewer.com/public/weather-maps.json")
+    .then(res => res.json())
+    .then(data => {
+      radarFrames = data.radar?.past || [];
+      let loaded = 0;
+      radarFrames.forEach(frame => {
+        const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+        const layer = L.tileLayer(url, { opacity: 0, zIndex: 10 });
+        layer.on('load', () => {
+          loaded++;
+          if (loaded === radarFrames.length) {
+            radarLayers[0].setOpacity(0.6);
+            if (playing) startRadar();
+          }
+        });
+        radarGroup.addLayer(layer);
+        radarLayers.push(layer);
+      });
+    });
+
+  // --- NWS Alerts ---
+  let countyGeo = null;
+  const ALERT_API = "https://api.weather.gov/alerts/active";
+  const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
+
+  function getAlertColor(event) {
+    const e = event.toLowerCase();
+    if (e.includes("extreme heat")) return "red";
+    if (e === "severe thunderstorm warning") return "orange";
+    if (e === "flash flood warning") return "blue";
+    if (e === "flood advisory") return "lightblue";
+    if (e === "flood warning") return "#3399cc";
+    if (e === "flood watch") return "green";
+    if (e === "heat advisory") return "#ffcc66";
+    if (e === "red flag warning") return "pink";
+    return "#999";
+  }
+
+  function fetchWeatherAlerts() {
+    if (!countyGeo) return;
+
+    fetch(ALERT_API)
+      .then(res => res.json())
+      .then(data => {
+        const now = Date.now();
+        const alerts = data.features.filter(f => {
+          const p = f.properties;
+          return new Date(p.expires).getTime() > now &&
+                 p.event.toLowerCase() !== "special weather statement";
+        });
+
+        document.getElementById("alertFeed").innerHTML = alerts.length === 0
+          ? "<p>No active alerts.</p>"
+          : alerts.map(f => {
+              const p = f.properties;
+              return `<div style="margin-bottom:10px">
+                <strong>${p.event}</strong><br/>
+                <em>${p.areaDesc}</em><br/>
+                <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
+                <span>${p.headline}</span><br/>
+                <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
+                <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
+              </div>`;
+            }).join("");
+
+        alertLayerGroup.clearLayers();
+
+        alerts.forEach(alert => {
+          const codes = alert.properties.geocode?.SAME || [];
+          const fipsList = codes.map(c => c.length === 6 ? c.slice(1) : c);
+          const matchingFeatures = countyGeo.features.filter(f => fipsList.includes(f.id));
+          if (matchingFeatures.length) {
+            L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
+              style: {
+                color: getAlertColor(alert.properties.event),
+                weight: 2, opacity: 0.8, fillOpacity: 0.1
+              },
+              onEachFeature: (feature, layer) => {
+                layer.bindPopup(`
+                  <strong>${alert.properties.event}</strong><br/>
+                  ${alert.properties.headline}<br/>
+                  <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small><br/>
+                  <a class="alert-link" href="${alert.properties['@id']}" target="_blank">View Alert</a>
+                `);
+              }
+            }).addTo(alertLayerGroup);
+          }
+        });
+      });
+  }
+
+  fetch(COUNTY_GEOJSON)
+    .then(res => res.json())
+    .then(data => {
+      countyGeo = data;
+      fetchWeatherAlerts();
+      setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
+    });
 </script>
-
 </body>
 </html>
