@@ -10,7 +10,150 @@
     #controls, #alerts {
       position: absolute; z-index: 1000;
       background: white; padding: 10px;
+      border-radius: 6px; font-family: sans-serif;<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radar + NWS Alerts + FIRMS Fires</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    #controls, #alerts {
+      position: absolute; z-index: 1000;
+      background: white; padding: 10px;
       border-radius: 6px; font-family: sans-serif;
+      font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    #controls { top: 10px; left: 10px; }
+    #alerts {
+      bottom: 10px; left: 10px;
+      max-height: 250px; width: 300px;
+      overflow-y: auto;
+    }
+    button { margin-top: 5px; }
+    .alert-link {
+      color: #0077cc;
+      text-decoration: underline;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="controls">
+  <label><input type="checkbox" id="toggle-firms" /> FIRMS Fires</label><br>
+  <strong>Radar Animation</strong><br>
+  <button id="toggleBtn">Pause</button>
+</div>
+
+<div id="alerts">
+  <strong>Live Weather Alerts (Active Only)</strong>
+  <div id="alertFeed">Loading...</div>
+</div>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const map = L.map('map').setView([37.8, -96], 5);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+  }).addTo(map);
+
+  // --- Layer Groups ---
+  const radarGroup = L.layerGroup().addTo(map);
+  const alertLayerGroup = L.layerGroup().addTo(map);
+
+  // --- Layer Toggle Control ---
+  L.control.layers(null, {
+    'Radar': radarGroup,
+    'NWS Alerts': alertLayerGroup
+  }).addTo(map);
+
+  // --- Radar Animation ---
+  const radarTiles = [];
+  let radarIndex = 0;
+  let radarInterval = null;
+  const radarTimes = ['0', '1', '2', '3', '4', '5']; // simulate frames
+
+  function updateRadar() {
+    if (radarTiles.length > 0) {
+      radarGroup.clearLayers();
+      radarGroup.addLayer(radarTiles[radarIndex]);
+      radarIndex = (radarIndex + 1) % radarTiles.length;
+    }
+  }
+
+  function startRadar() {
+    radarTiles.length = 0;
+    for (let i = 0; i < radarTimes.length; i++) {
+      let tile = L.tileLayer(`https://tile.openweathermap.org/map/precipitation_new/${i}/{z}/{x}/{y}.png?appid=your_api_key`, {
+        opacity: 0.5,
+        attribution: '&copy; OpenWeatherMap'
+      });
+      radarTiles.push(tile);
+    }
+    radarIndex = 0;
+    updateRadar();
+    radarInterval = setInterval(updateRadar, 1000);
+  }
+
+  function stopRadar() {
+    clearInterval(radarInterval);
+    radarInterval = null;
+  }
+
+  document.getElementById('toggleBtn').addEventListener('click', function () {
+    if (radarInterval) {
+      stopRadar();
+      this.textContent = 'Play';
+    } else {
+      startRadar();
+      this.textContent = 'Pause';
+    }
+  });
+
+  startRadar();
+
+  // --- NWS Alerts Feed ---
+  async function loadAlerts() {
+    const res = await fetch('https://api.weather.gov/alerts/active');
+    const data = await res.json();
+    const alertFeed = document.getElementById('alertFeed');
+    alertFeed.innerHTML = '';
+    data.features.forEach(alert => {
+      const div = document.createElement('div');
+      div.innerHTML = `<a class="alert-link" href="${alert.properties.uri}" target="_blank">${alert.properties.headline}</a>`;
+      alertFeed.appendChild(div);
+    });
+  }
+
+  loadAlerts();
+  setInterval(loadAlerts, 60000);
+
+  // --- FIRMS Fire Layer Toggle ---
+  let firmsLayer;
+
+  document.getElementById('toggle-firms').addEventListener('change', e => {
+    if (!firmsLayer) {
+      firmsLayer = L.tileLayer.wms(
+        'https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires?MAP_KEY=98816b6dadda86b7a77d0477889142db', {
+        layers: 'fires_viirs_24',
+        format: 'image/png',
+        transparent: true,
+        version: '1.3.0',
+        attribution: 'NASA FIRMS',
+        opacity: 1
+      });
+    }
+    e.target.checked ? firmsLayer.addTo(map) : map.removeLayer(firmsLayer);
+  });
+</script>
+</body>
+</html>
+
       font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
     #controls { top: 10px; left: 10px; }
