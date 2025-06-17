@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Smooth Radar Animation</title>
+  <title>Smooth Radar + NWS Alerts</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -15,16 +15,26 @@
       margin: 0;
       padding: 0;
     }
-    #controls {
+    #controls, #alerts {
       position: absolute;
-      top: 10px;
-      left: 10px;
       z-index: 1000;
       background: white;
       padding: 10px;
       border-radius: 6px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.3);
       font-family: sans-serif;
+      font-size: 13px;
+    }
+    #controls {
+      top: 10px;
+      left: 10px;
+    }
+    #alerts {
+      bottom: 10px;
+      left: 10px;
+      max-height: 250px;
+      width: 300px;
+      overflow-y: auto;
     }
     button {
       margin-top: 5px;
@@ -36,17 +46,25 @@
     <strong>Radar Animation</strong><br>
     <button id="toggleBtn">Pause</button>
   </div>
+
+  <div id="alerts">
+    <strong>Live Weather Alerts</strong>
+    <div id="alertFeed">Loading...</div>
+  </div>
+
   <div id="map"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
     const map = L.map('map').setView([37.8, -96], 5);
 
+    // Base layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
     }).addTo(map);
 
+    // Radar animation
     let radarFrames = [];
     let radarLayers = [];
     let currentFrameIndex = 0;
@@ -71,12 +89,11 @@
     }
 
     function startAnimation() {
-  animationInterval = setInterval(() => {
-    showFrame(currentFrameIndex);
-    currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
-  }, 333); // 1.5x faster
-}
-
+      animationInterval = setInterval(() => {
+        showFrame(currentFrameIndex);
+        currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
+      }, 333); // 1.5x faster
+    }
 
     function stopAnimation() {
       clearInterval(animationInterval);
@@ -101,6 +118,58 @@
       document.getElementById("toggleBtn").innerText = isPlaying ? "Pause" : "Play";
       isPlaying ? startAnimation() : stopAnimation();
     });
+
+    // Live alerts panel + map overlay
+    let alertLayerGroup = L.layerGroup().addTo(map);
+
+    function fetchWeatherAlerts() {
+      fetch("https://api.weather.gov/alerts/active")
+        .then(res => res.json())
+        .then(data => {
+          const feed = document.getElementById("alertFeed");
+          const alerts = data.features.slice(0, 10); // show top 10
+          alertLayerGroup.clearLayers();
+
+          if (!alerts.length) {
+            feed.innerHTML = "<p>No active alerts.</p>";
+            return;
+          }
+
+          feed.innerHTML = alerts.map(alert => {
+            const props = alert.properties;
+            return `
+              <div style="margin-bottom: 10px;">
+                <strong>${props.event}</strong><br/>
+                <em>${props.areaDesc}</em><br/>
+                <span style="color: gray;">${props.severity} - ${props.urgency}</span><br/>
+                <span>${props.headline}</span>
+              </div>
+            `;
+          }).join('');
+
+          // Draw outlines on map
+          alerts.forEach(alert => {
+            if (alert.geometry) {
+              const layer = L.geoJSON(alert.geometry, {
+                style: {
+                  color: 'red',
+                  weight: 2,
+                  opacity: 0.8,
+                  fillOpacity: 0.1
+                }
+              });
+              alertLayerGroup.addLayer(layer);
+            }
+          });
+        })
+        .catch(err => {
+          console.error("Alert fetch error:", err);
+          document.getElementById("alertFeed").innerText = "Error loading alerts.";
+        });
+    }
+
+    fetchWeatherAlerts();
+    setInterval(fetchWeatherAlerts, 5 * 60 * 1000); // refresh every 5 min
   </script>
 </body>
 </html>
