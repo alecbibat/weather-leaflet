@@ -118,16 +118,20 @@
   const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
 
   function getAlertColor(event) {
-  const lower = event.toLowerCase();
+  const e = event.toLowerCase();
 
-  if (lower === "extreme heat") return "red";
-  if (lower === "severe thunderstorm warning") return "orange";
-  if (lower === "flash flood warning") return "blue";
-  if (lower === "flood advisory") return "lightblue";
-  if (lower === "heat advisory") return "gray";
+  if (e === "extreme heat" || e === "extreme heat warning") return "red";
+  if (e === "severe thunderstorm warning") return "orange";
+  if (e === "flash flood warning") return "blue";
+  if (e === "flood advisory") return "lightblue";
+  if (e === "flood warning") return "lightblue";
+  if (e === "flood watch") return "green";
+  if (e === "heat advisory") return "yellow";
+  if (e === "red flag warning") return "pink";
 
-  return "#999"; // fallback color
+  return "#999"; // fallback
 }
+
 
 
   function fetchWeatherAlerts() {
