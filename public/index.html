@@ -32,6 +32,8 @@
 <div id="controls">
   <strong>Radar Animation</strong><br>
   <button id="toggleBtn">Pause</button>
+  <label><input type="checkbox" id="toggle-radar" checked /> Radar</label>
+  <label><input type="checkbox" id="toggle-alerts" checked /> NWS Alerts</label>
   <label><input type="checkbox" id="toggle-firms" /> FIRMS Fires</label>
 </div>
 
@@ -50,33 +52,10 @@
     attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
-  // --- FIRMS Layer ---
-  let firmsLayer = null;
-  document.getElementById('toggle-firms').addEventListener('change', e => {
-    if (e.target.checked) {
-      if (!firmsLayer) {
-        firmsLayer = L.tileLayer.wms(
-          'https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires?MAP_KEY=98816b6dadda86b7a77d0477889142db', {
-          layers: 'fires_viirs_24',
-          format: 'image/png',
-          transparent: true,
-          attribution: 'NASA FIRMS'
-        });
-      }
-      firmsLayer.addTo(map);
-    } else {
-      if (firmsLayer) {
-        map.removeLayer(firmsLayer);
-      }
-    }
-  });
-
-  // --- Layer Groups ---
+  // --- Radar Layer Group ---
   const radarGroup = L.layerGroup().addTo(map);
-  const alertLayerGroup = L.layerGroup().addTo(map);
-
-  // --- RainViewer Radar Animation ---
   let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
+
   function startRadar() {
     radarInterval = setInterval(() => {
       radarLayers.forEach((layer, i) => {
@@ -85,7 +64,10 @@
       frameIndex = (frameIndex + 1) % radarLayers.length;
     }, 333);
   }
-  function stopRadar() { clearInterval(radarInterval); }
+
+  function stopRadar() {
+    clearInterval(radarInterval);
+  }
 
   document.getElementById("toggleBtn").addEventListener("click", () => {
     playing = !playing;
@@ -113,7 +95,17 @@
       });
     });
 
+  // --- Radar Toggle ---
+  document.getElementById('toggle-radar').addEventListener('change', e => {
+    if (e.target.checked) {
+      map.addLayer(radarGroup);
+    } else {
+      map.removeLayer(radarGroup);
+    }
+  });
+
   // --- NWS Alerts ---
+  const alertLayerGroup = L.layerGroup().addTo(map);
   let countyGeo = null;
   const ALERT_API = "https://api.weather.gov/alerts/active";
   const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
@@ -191,6 +183,36 @@
       fetchWeatherAlerts();
       setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
     });
+
+  // --- NWS Alerts Toggle ---
+  document.getElementById('toggle-alerts').addEventListener('change', e => {
+    if (e.target.checked) {
+      map.addLayer(alertLayerGroup);
+    } else {
+      map.removeLayer(alertLayerGroup);
+    }
+  });
+
+  // --- FIRMS Fires Toggle ---
+  let firmsLayer = null;
+  document.getElementById('toggle-firms').addEventListener('change', e => {
+    if (e.target.checked) {
+      if (!firmsLayer) {
+        firmsLayer = L.tileLayer.wms(
+          'https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires?MAP_KEY=98816b6dadda86b7a77d0477889142db', {
+          layers: 'fires_viirs_24',
+          format: 'image/png',
+          transparent: true,
+          attribution: 'NASA FIRMS'
+        });
+      }
+      firmsLayer.addTo(map);
+    } else {
+      if (firmsLayer) {
+        map.removeLayer(firmsLayer);
+      }
+    }
+  });
 </script>
 </body>
 </html>
