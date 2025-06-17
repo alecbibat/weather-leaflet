@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Smooth Radar + NWS Alerts</title>
+  <title>Smooth Radar + 24h NWS Alerts</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -48,7 +48,7 @@
   </div>
 
   <div id="alerts">
-    <strong>Live Weather Alerts</strong>
+    <strong>Live Weather Alerts (Last 24 Hours)</strong>
     <div id="alertFeed">Loading...</div>
   </div>
 
@@ -64,35 +64,32 @@
       maxZoom: 19
     }).addTo(map);
 
-    // Radar animation setup
+    // Radar animation setup (1.5× speed smooth)
     let radarFrames = [];
     let radarLayers = [];
     let currentFrameIndex = 0;
-    let animationInterval = null;
+    let animationInterval;
     let isPlaying = true;
 
     function preloadRadarFrames(frames) {
-      frames.forEach((frame) => {
+      frames.forEach(frame => {
         const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-        const layer = L.tileLayer(url, {
-          opacity: 0,
-          zIndex: 10
-        }).addTo(map);
+        const layer = L.tileLayer(url, { opacity: 0, zIndex: 10 }).addTo(map);
         radarLayers.push(layer);
       });
     }
 
-    function showFrame(index) {
-      radarLayers.forEach((layer, i) => {
-        layer.setOpacity(i === index ? 0.6 : 0);
-      });
+    function showFrame(idx) {
+      radarLayers.forEach((layer, i) =>
+        layer.setOpacity(i === idx ? 0.6 : 0)
+      );
     }
 
     function startAnimation() {
       animationInterval = setInterval(() => {
         showFrame(currentFrameIndex);
         currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
-      }, 333); // 1.5× faster
+      }, 333);
     }
 
     function stopAnimation() {
@@ -100,94 +97,100 @@
     }
 
     fetch("https://api.rainviewer.com/public/weather-maps.json")
-      .then(res => res.json())
+      .then(r => r.json())
       .then(data => {
         radarFrames = data.radar?.past || [];
-        if (!radarFrames.length) {
-          alert("No radar frames available.");
-          return;
-        }
+        if (!radarFrames.length) return alert("No radar frames available.");
         preloadRadarFrames(radarFrames);
         showFrame(0);
         startAnimation();
       })
-      .catch(err => {
-        console.error("Radar fetch error:", err);
-      });
+      .catch(err => console.error("Radar fetch error:", err));
 
     document.getElementById("toggleBtn").addEventListener("click", () => {
       isPlaying = !isPlaying;
-      document.getElementById("toggleBtn").innerText = isPlaying ? "Pause" : "Play";
+      toggleBtn.innerText = isPlaying ? "Pause" : "Play";
       isPlaying ? startAnimation() : stopAnimation();
     });
 
-    // Live NWS alerts
+    // NWS alerts (last 24h) + map overlay
     const alertLayerGroup = L.layerGroup().addTo(map);
 
-    function getAlertColor(eventType) {
-      if (/tornado/i.test(eventType)) return "red";
-      if (/flood/i.test(eventType)) return "blue";
-      if (/wind/i.test(eventType)) return "orange";
-      if (/heat|cold/i.test(eventType)) return "purple";
-      if (/fire/i.test(eventType)) return "darkred";
+    function getAlertColor(evt) {
+      if (/tornado/i.test(evt)) return "red";
+      if (/flood/i.test(evt)) return "blue";
+      if (/wind/i.test(evt)) return "orange";
+      if (/heat|cold/i.test(evt)) return "purple";
+      if (/fire/i.test(evt)) return "darkred";
       return "gray";
     }
 
     function fetchWeatherAlerts() {
       fetch("https://api.weather.gov/alerts/active")
-        .then(res => res.json())
+        .then(r => r.json())
         .then(data => {
           const feed = document.getElementById("alertFeed");
-          const alerts = data.features.slice(0, 10);
-          alertLayerGroup.clearLayers();
+          const now = Date.now();
+          const oneDayAgo = now - 24*60*60*1000;
 
-          if (!alerts.length) {
-            feed.innerHTML = "<p>No active alerts.</p>";
+          // Filter to those sent within last 24h
+          const recent = (data.features || []).filter(f => {
+            const sent = new Date(f.properties.sent).getTime();
+            return sent >= oneDayAgo;
+          });
+
+          alertLayerGroup.clearLayers();
+          if (!recent.length) {
+            feed.innerHTML = "<p>No alerts in the last 24 hours.</p>";
             return;
           }
 
-          feed.innerHTML = alerts.map(alert => {
-            const p = alert.properties;
+          // Populate feed
+          feed.innerHTML = recent.map(f => {
+            const p = f.properties;
             return `
               <div style="margin-bottom:10px">
                 <strong>${p.event}</strong><br/>
                 <em>${p.areaDesc}</em><br/>
                 <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
-                <span>${p.headline}</span>
+                <span>${p.headline}</span><br/>
+                <small>Sent: ${new Date(p.sent).toLocaleString()}</small>
               </div>
             `;
-          }).join('');
+          }).join("");
 
-          alerts.forEach(alert => {
-            if (alert.geometry) {
-              const geo = L.geoJSON(alert.geometry, {
+          // Draw polygons for each
+          recent.forEach(f => {
+            if (f.geometry) {
+              const layer = L.geoJSON(f.geometry, {
                 style: () => ({
-                  color: getAlertColor(alert.properties.event),
+                  color: getAlertColor(f.properties.event),
                   weight: 2,
                   opacity: 0.8,
                   fillOpacity: 0.1
                 }),
-                onEachFeature: (feature, layer) => {
-                  const p = alert.properties;
-                  layer.bindPopup(`
+                onEachFeature: (_, lyr) => {
+                  const p = f.properties;
+                  lyr.bindPopup(`
                     <strong>${p.event}</strong><br/>
                     <em>${p.areaDesc}</em><br/>
-                    ${p.headline}
+                    ${p.headline}<br/>
+                    <small>Sent: ${new Date(p.sent).toLocaleString()}</small>
                   `);
                 }
               });
-              alertLayerGroup.addLayer(geo);
+              alertLayerGroup.addLayer(layer);
             }
           });
         })
         .catch(err => {
           console.error("Alert fetch error:", err);
-          document.getElementById("alertFeed").innerText = "Error loading alerts.";
+          alertFeed.innerText = "Error loading alerts.";
         });
     }
 
     fetchWeatherAlerts();
-    setInterval(fetchWeatherAlerts, 5 * 60 * 1000); // every 5 minutes
+    setInterval(fetchWeatherAlerts, 5*60*1000); // refresh every 5 min
   </script>
 </body>
 </html>
