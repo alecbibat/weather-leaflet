@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Radar + NWS Alerts with Counties</title>
+  <title>Radar + Active NWS Alerts with Counties</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     html, body, #map {
@@ -45,7 +45,7 @@
 </div>
 
 <div id="alerts">
-  <strong>Live Weather Alerts (Last 24h)</strong>
+  <strong>Live Weather Alerts (Active Only)</strong>
   <div id="alertFeed">Loading...</div>
 </div>
 
@@ -60,7 +60,7 @@
     maxZoom: 19
   }).addTo(map);
 
-  // Radar Animation (preload & smooth)
+  // Radar Animation
   let radarFrames = [];
   let radarLayers = [];
   let currentFrameIndex = 0;
@@ -138,15 +138,14 @@
       .then(res => res.json())
       .then(data => {
         const now = Date.now();
-        const oneDayAgo = now - 24 * 60 * 60 * 1000;
         const alerts = data.features.filter(f => {
-          const sent = new Date(f.properties.sent).getTime();
-          return sent >= oneDayAgo;
+          const expires = new Date(f.properties.expires).getTime();
+          return expires > now;
         });
 
         document.getElementById("alertFeed").innerHTML =
           alerts.length === 0
-            ? "<p>No alerts in the last 24 hours.</p>"
+            ? "<p>No active alerts.</p>"
             : alerts.map(f => {
                 const p = f.properties;
                 return `<div style="margin-bottom:10px">
@@ -154,7 +153,7 @@
                   <em>${p.areaDesc}</em><br/>
                   <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
                   <span>${p.headline}</span><br/>
-                  <small>Sent: ${new Date(p.sent).toLocaleString()}</small>
+                  <small>Expires: ${new Date(p.expires).toLocaleString()}</small>
                 </div>`;
               }).join("");
 
@@ -185,7 +184,7 @@
                 layer.bindPopup(`
                   <strong>${alert.properties.event}</strong><br/>
                   ${alert.properties.headline}<br/>
-                  <small>${new Date(alert.properties.sent).toLocaleString()}</small>
+                  <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small>
                 `);
               }
             }).addTo(alertLayerGroup);
