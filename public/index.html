@@ -13,26 +13,43 @@
       border-radius: 6px; font-family: sans-serif;
       font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-    #controls {
-      top: 10px; right: 10px; width: 200px;
-    }
+    #controls { top: 10px; right: 10px; width: 200px; }
     #alerts {
       top: 10px; left: 10px;
-      bottom: 10px;
-      overflow-y: auto;
+      height: calc(100% - 20px);
       width: 300px;
+      overflow-y: auto;
     }
-    button, label { margin-top: 5px; display: block; }
+    label { margin-top: 5px; display: block; }
     .alert-link {
       color: #0077cc;
       text-decoration: underline;
       font-size: 12px;
     }
+    .alert-card {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px;
+      margin-bottom: 10px;
+      background-color: #f9f9f9;
+    }
+    .alert-card strong {
+      font-size: 14px;
+      color: #cc0000;
+    }
+    .alert-card em {
+      font-style: italic;
+      color: #555;
+    }
+    .alert-card small {
+      display: block;
+      color: #777;
+    }
     .leaflet-control-zoom {
+      bottom: 10px !important;
+      top: auto !important;
       right: 10px !important;
       left: auto !important;
-      bottom: 10px;
-      top: auto !important;
     }
   </style>
 </head>
@@ -59,7 +76,6 @@
     attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
-  // --- Radar Layer Group ---
   const radarGroup = L.layerGroup().addTo(map);
   let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
 
@@ -96,7 +112,6 @@
       });
     });
 
-  // --- Radar Toggle ---
   document.getElementById('toggle-radar').addEventListener('change', e => {
     if (e.target.checked) {
       map.addLayer(radarGroup);
@@ -105,7 +120,6 @@
     }
   });
 
-  // --- NWS Alerts ---
   const alertLayerGroup = L.layerGroup().addTo(map);
   let countyGeo = null;
   const ALERT_API = "https://api.weather.gov/alerts/active";
@@ -141,7 +155,7 @@
           ? "<p>No active alerts.</p>"
           : alerts.map(f => {
               const p = f.properties;
-              return `<div style="margin-bottom:10px">
+              return `<div class="alert-card">
                 <strong>${p.event}</strong><br/>
                 <em>${p.areaDesc}</em><br/>
                 <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
@@ -185,7 +199,6 @@
       setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
     });
 
-  // --- NWS Alerts Toggle ---
   document.getElementById('toggle-alerts').addEventListener('change', e => {
     if (e.target.checked) {
       map.addLayer(alertLayerGroup);
@@ -194,7 +207,7 @@
     }
   });
 
-  // --- FIRMS Fires Toggle ---
+  // FIRMS Fires WMS
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
