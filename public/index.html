@@ -7,39 +7,19 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
-
-    #controls {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      width: 200px;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
-      border-radius: 6px;
-      font-family: sans-serif;
-      font-size: 13px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    #controls, #alerts {
+      position: absolute; z-index: 1000;
+      background: white; padding: 10px;
+      border-radius: 6px; font-family: sans-serif;
+      font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-
+    #controls { top: 10px; right: 10px; width: 200px; }
     #alerts {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
-      border-radius: 6px;
-      font-family: sans-serif;
-      font-size: 13px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      max-height: 250px;
-      width: 300px;
+      bottom: 10px; left: 10px;
+      max-height: 250px; width: 300px;
       overflow-y: auto;
     }
-
-    button, label { margin-top: 5px; display: block; }
-
+    label { margin-top: 5px; display: block; }
     .alert-link {
       color: #0077cc;
       text-decoration: underline;
@@ -50,8 +30,7 @@
 <body>
 
 <div id="controls">
-  <strong>Radar Animation</strong><br>
-  <button id="toggleBtn">Pause</button>
+  <strong>Radar Animation</strong>
   <label><input type="checkbox" id="toggle-radar" checked /> Radar</label>
   <label><input type="checkbox" id="toggle-alerts" checked /> NWS Alerts</label>
   <label><input type="checkbox" id="toggle-firms" /> FIRMS Fires</label>
@@ -72,13 +51,12 @@
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
   // --- Radar Layer Group ---
   const radarGroup = L.layerGroup().addTo(map);
-  let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
+  let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval;
 
   function startRadar() {
     radarInterval = setInterval(() => {
@@ -88,16 +66,6 @@
       frameIndex = (frameIndex + 1) % radarLayers.length;
     }, 333);
   }
-
-  function stopRadar() {
-    clearInterval(radarInterval);
-  }
-
-  document.getElementById("toggleBtn").addEventListener("click", () => {
-    playing = !playing;
-    document.getElementById("toggleBtn").innerText = playing ? "Pause" : "Play";
-    playing ? startRadar() : stopRadar();
-  });
 
   fetch("https://api.rainviewer.com/public/weather-maps.json")
     .then(res => res.json())
@@ -111,7 +79,7 @@
           loaded++;
           if (loaded === radarFrames.length) {
             radarLayers[0].setOpacity(0.6);
-            if (playing) startRadar();
+            startRadar();
           }
         });
         radarGroup.addLayer(layer);
@@ -119,8 +87,13 @@
       });
     });
 
+  // --- Radar Toggle ---
   document.getElementById('toggle-radar').addEventListener('change', e => {
-    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
+    if (e.target.checked) {
+      map.addLayer(radarGroup);
+    } else {
+      map.removeLayer(radarGroup);
+    }
   });
 
   // --- NWS Alerts ---
@@ -179,9 +152,7 @@
             L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
               style: {
                 color: getAlertColor(alert.properties.event),
-                weight: 2,
-                opacity: 0.8,
-                fillOpacity: 0.1
+                weight: 2, opacity: 0.8, fillOpacity: 0.1
               },
               onEachFeature: (feature, layer) => {
                 layer.bindPopup(`
@@ -205,11 +176,16 @@
       setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
     });
 
+  // --- NWS Alerts Toggle ---
   document.getElementById('toggle-alerts').addEventListener('change', e => {
-    e.target.checked ? map.addLayer(alertLayerGroup) : map.removeLayer(alertLayerGroup);
+    if (e.target.checked) {
+      map.addLayer(alertLayerGroup);
+    } else {
+      map.removeLayer(alertLayerGroup);
+    }
   });
 
-  // --- FIRMS Fires Toggle (WMS Layer) ---
+  // --- FIRMS Fires Toggle ---
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
