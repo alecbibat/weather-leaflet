@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Smooth Radar + NWS Alerts</title>
+  <title>Weather Map with Radar + Alerts</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -58,13 +58,20 @@
   <script>
     const map = L.map('map').setView([37.8, -96], 5);
 
-    // Base layer
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Basemaps
+    const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri',
+      maxZoom: 13
+    });
+
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
-    }).addTo(map);
+    });
 
-    // Radar animation
+    terrainLayer.addTo(map);
+
+    // Radar animation setup
     let radarFrames = [];
     let radarLayers = [];
     let currentFrameIndex = 0;
@@ -72,7 +79,7 @@
     let isPlaying = true;
 
     function preloadRadarFrames(frames) {
-      frames.forEach((frame, i) => {
+      frames.forEach((frame) => {
         const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
         const layer = L.tileLayer(url, {
           opacity: 0,
@@ -92,7 +99,7 @@
       animationInterval = setInterval(() => {
         showFrame(currentFrameIndex);
         currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
-      }, 333); // 1.5x faster
+      }, 333); // 1.5x speed
     }
 
     function stopAnimation() {
@@ -107,7 +114,6 @@
           alert("No radar frames available.");
           return;
         }
-
         preloadRadarFrames(radarFrames);
         showFrame(0);
         startAnimation();
@@ -119,15 +125,24 @@
       isPlaying ? startAnimation() : stopAnimation();
     });
 
-    // Live alerts panel + map overlay
-    let alertLayerGroup = L.layerGroup().addTo(map);
+    // Alert styling & logic
+    const alertLayerGroup = L.layerGroup().addTo(map);
+
+    function getAlertColor(eventType) {
+      if (/tornado/i.test(eventType)) return "red";
+      if (/flood/i.test(eventType)) return "blue";
+      if (/wind/i.test(eventType)) return "orange";
+      if (/heat|cold/i.test(eventType)) return "purple";
+      if (/fire/i.test(eventType)) return "darkred";
+      return "gray";
+    }
 
     function fetchWeatherAlerts() {
       fetch("https://api.weather.gov/alerts/active")
         .then(res => res.json())
         .then(data => {
           const feed = document.getElementById("alertFeed");
-          const alerts = data.features.slice(0, 10); // show top 10
+          const alerts = data.features.slice(0, 10);
           alertLayerGroup.clearLayers();
 
           if (!alerts.length) {
@@ -147,18 +162,25 @@
             `;
           }).join('');
 
-          // Draw outlines on map
           alerts.forEach(alert => {
             if (alert.geometry) {
-              const layer = L.geoJSON(alert.geometry, {
-                style: {
-                  color: 'red',
+              const geo = L.geoJSON(alert.geometry, {
+                style: () => ({
+                  color: getAlertColor(alert.properties.event),
                   weight: 2,
                   opacity: 0.8,
-                  fillOpacity: 0.1
+                  fillOpacity: 0.15
+                }),
+                onEachFeature: (feature, layer) => {
+                  const p = alert.properties;
+                  layer.bindPopup(`
+                    <strong>${p.event}</strong><br/>
+                    <em>${p.areaDesc}</em><br/>
+                    <span>${p.headline}</span>
+                  `);
                 }
               });
-              alertLayerGroup.addLayer(layer);
+              alertLayerGroup.addLayer(geo);
             }
           });
         })
@@ -169,7 +191,20 @@
     }
 
     fetchWeatherAlerts();
-    setInterval(fetchWeatherAlerts, 5 * 60 * 1000); // refresh every 5 min
+    setInterval(fetchWeatherAlerts, 5 * 60 * 1000); // every 5 min
+
+    // Layer control
+    const baseLayers = {
+      "Terrain": terrainLayer,
+      "OpenStreetMap": osmLayer
+    };
+
+    const overlays = {
+      "Radar": L.layerGroup(radarLayers),
+      "NWS Alerts": alertLayerGroup
+    };
+
+    L.control.layers(baseLayers, overlays).addTo(map);
   </script>
 </body>
 </html>
