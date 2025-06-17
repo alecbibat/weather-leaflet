@@ -7,19 +7,39 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
-    #controls, #alerts {
-      position: absolute; z-index: 1000;
-      background: white; padding: 10px;
-      border-radius: 6px; font-family: sans-serif;
-      font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+
+    #controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 200px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      font-family: sans-serif;
+      font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-    #controls { top: 10px; left: 10px; width: 200px; }
+
     #alerts {
-      bottom: 10px; left: 10px;
-      max-height: 250px; width: 300px;
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      font-family: sans-serif;
+      font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      max-height: 250px;
+      width: 300px;
       overflow-y: auto;
     }
+
     button, label { margin-top: 5px; display: block; }
+
     .alert-link {
       color: #0077cc;
       text-decoration: underline;
@@ -46,10 +66,14 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-  const map = L.map('map').setView([37.8, -96], 5);
+  const map = L.map('map', {
+    zoomControl: false
+  }).setView([37.8, -96], 5);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
   }).addTo(map);
 
   // --- Radar Layer Group ---
@@ -95,13 +119,8 @@
       });
     });
 
-  // --- Radar Toggle ---
   document.getElementById('toggle-radar').addEventListener('change', e => {
-    if (e.target.checked) {
-      map.addLayer(radarGroup);
-    } else {
-      map.removeLayer(radarGroup);
-    }
+    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
   });
 
   // --- NWS Alerts ---
@@ -160,7 +179,9 @@
             L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
               style: {
                 color: getAlertColor(alert.properties.event),
-                weight: 2, opacity: 0.8, fillOpacity: 0.1
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.1
               },
               onEachFeature: (feature, layer) => {
                 layer.bindPopup(`
@@ -184,16 +205,11 @@
       setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
     });
 
-  // --- NWS Alerts Toggle ---
   document.getElementById('toggle-alerts').addEventListener('change', e => {
-    if (e.target.checked) {
-      map.addLayer(alertLayerGroup);
-    } else {
-      map.removeLayer(alertLayerGroup);
-    }
+    e.target.checked ? map.addLayer(alertLayerGroup) : map.removeLayer(alertLayerGroup);
   });
 
-  // --- FIRMS Fires Toggle ---
+  // --- FIRMS Fires Toggle (WMS Layer) ---
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
