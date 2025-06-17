@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Radar + Active NWS Alerts with Counties</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -21,10 +21,7 @@
       font-family: sans-serif;
       font-size: 13px;
     }
-    #controls {
-      top: 10px;
-      left: 10px;
-    }
+    #controls { top: 10px; left: 10px; }
     #alerts {
       bottom: 10px;
       left: 10px;
@@ -32,9 +29,7 @@
       width: 300px;
       overflow-y: auto;
     }
-    button {
-      margin-top: 5px;
-    }
+    button { margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -139,8 +134,12 @@
       .then(data => {
         const now = Date.now();
         const alerts = data.features.filter(f => {
-          const expires = new Date(f.properties.expires).getTime();
-          return expires > now;
+          const p = f.properties;
+          const expires = new Date(p.expires).getTime();
+          return (
+            expires > now &&
+            p.event.toLowerCase() !== "special weather statement"
+          );
         });
 
         document.getElementById("alertFeed").innerHTML =
