@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>RainViewer Radar Animation</title>
+  <title>Smooth Radar Animation</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -40,7 +40,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
-    const map = L.map('map').setView([37.8, -96], 5); // Center on USA
+    const map = L.map('map').setView([37.8, -96], 5);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
@@ -48,30 +48,33 @@
     }).addTo(map);
 
     let radarFrames = [];
+    let radarLayers = [];
     let currentFrameIndex = 0;
-    let radarLayer = null;
     let animationInterval = null;
     let isPlaying = true;
 
-    function updateRadarFrame(index) {
-      if (radarLayer) {
-        map.removeLayer(radarLayer);
-      }
+    function preloadRadarFrames(frames) {
+      frames.forEach((frame, i) => {
+        const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+        const layer = L.tileLayer(url, {
+          opacity: 0,
+          zIndex: 10
+        }).addTo(map);
+        radarLayers.push(layer);
+      });
+    }
 
-      const frame = radarFrames[index];
-      const tileUrl = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-
-      radarLayer = L.tileLayer(tileUrl, {
-        opacity: 0.6,
-        zIndex: 10
-      }).addTo(map);
+    function showFrame(index) {
+      radarLayers.forEach((layer, i) => {
+        layer.setOpacity(i === index ? 0.6 : 0);
+      });
     }
 
     function startAnimation() {
       animationInterval = setInterval(() => {
-        updateRadarFrame(currentFrameIndex);
-        currentFrameIndex = (currentFrameIndex + 1) % radarFrames.length;
-      }, 500); // 500ms per frame
+        showFrame(currentFrameIndex);
+        currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
+      }, 500);
     }
 
     function stopAnimation() {
@@ -87,7 +90,8 @@
           return;
         }
 
-        updateRadarFrame(0);
+        preloadRadarFrames(radarFrames);
+        showFrame(0);
         startAnimation();
       });
 
