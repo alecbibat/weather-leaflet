@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Weather Map with Radar + Alerts</title>
+  <title>Smooth Radar + NWS Alerts</title>
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -58,18 +58,11 @@
   <script>
     const map = L.map('map').setView([37.8, -96], 5);
 
-    // Basemaps
-    const terrainLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri',
-      maxZoom: 13
-    });
-
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // Base OpenStreetMap layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
       maxZoom: 19
-    });
-
-    terrainLayer.addTo(map);
+    }).addTo(map);
 
     // Radar animation setup
     let radarFrames = [];
@@ -99,7 +92,7 @@
       animationInterval = setInterval(() => {
         showFrame(currentFrameIndex);
         currentFrameIndex = (currentFrameIndex + 1) % radarLayers.length;
-      }, 333); // 1.5x speed
+      }, 333); // 1.5× faster
     }
 
     function stopAnimation() {
@@ -109,14 +102,17 @@
     fetch("https://api.rainviewer.com/public/weather-maps.json")
       .then(res => res.json())
       .then(data => {
-        radarFrames = data.radar && data.radar.past;
-        if (!radarFrames || radarFrames.length === 0) {
+        radarFrames = data.radar?.past || [];
+        if (!radarFrames.length) {
           alert("No radar frames available.");
           return;
         }
         preloadRadarFrames(radarFrames);
         showFrame(0);
         startAnimation();
+      })
+      .catch(err => {
+        console.error("Radar fetch error:", err);
       });
 
     document.getElementById("toggleBtn").addEventListener("click", () => {
@@ -125,7 +121,7 @@
       isPlaying ? startAnimation() : stopAnimation();
     });
 
-    // Alert styling & logic
+    // Live NWS alerts
     const alertLayerGroup = L.layerGroup().addTo(map);
 
     function getAlertColor(eventType) {
@@ -151,13 +147,13 @@
           }
 
           feed.innerHTML = alerts.map(alert => {
-            const props = alert.properties;
+            const p = alert.properties;
             return `
-              <div style="margin-bottom: 10px;">
-                <strong>${props.event}</strong><br/>
-                <em>${props.areaDesc}</em><br/>
-                <span style="color: gray;">${props.severity} - ${props.urgency}</span><br/>
-                <span>${props.headline}</span>
+              <div style="margin-bottom:10px">
+                <strong>${p.event}</strong><br/>
+                <em>${p.areaDesc}</em><br/>
+                <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
+                <span>${p.headline}</span>
               </div>
             `;
           }).join('');
@@ -169,14 +165,14 @@
                   color: getAlertColor(alert.properties.event),
                   weight: 2,
                   opacity: 0.8,
-                  fillOpacity: 0.15
+                  fillOpacity: 0.1
                 }),
                 onEachFeature: (feature, layer) => {
                   const p = alert.properties;
                   layer.bindPopup(`
                     <strong>${p.event}</strong><br/>
                     <em>${p.areaDesc}</em><br/>
-                    <span>${p.headline}</span>
+                    ${p.headline}
                   `);
                 }
               });
@@ -191,20 +187,7 @@
     }
 
     fetchWeatherAlerts();
-    setInterval(fetchWeatherAlerts, 5 * 60 * 1000); // every 5 min
-
-    // Layer control
-    const baseLayers = {
-      "Terrain": terrainLayer,
-      "OpenStreetMap": osmLayer
-    };
-
-    const overlays = {
-      "Radar": L.layerGroup(radarLayers),
-      "NWS Alerts": alertLayerGroup
-    };
-
-    L.control.layers(baseLayers, overlays).addTo(map);
+    setInterval(fetchWeatherAlerts, 5 * 60 * 1000); // every 5 minutes
   </script>
 </body>
 </html>
