@@ -30,6 +30,11 @@
       overflow-y: auto;
     }
     button { margin-top: 5px; }
+    a.alert-link {
+      color: #0077cc;
+      text-decoration: underline;
+      font-size: 12px;
+    }
   </style>
 </head>
 <body>
@@ -118,22 +123,19 @@
   const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
 
   function getAlertColor(event) {
-  const e = event.toLowerCase();
+    const e = event.toLowerCase();
 
-  if (e === "extreme heat" || e === "extreme heat warning") return "red";
-  if (e === "severe thunderstorm warning") return "orange";
-  if (e === "flash flood warning") return "blue";
-  if (e === "flood advisory") return "lightblue";
-  if (e === "flood warning") return "#3399cc";       // updated
-  if (e === "flood watch") return "green";
-  if (e === "heat advisory") return "#ffcc66";        // updated
-  if (e === "red flag warning") return "pink";
+    if (e === "extreme heat" || e === "extreme heat warning") return "red";
+    if (e === "severe thunderstorm warning") return "orange";
+    if (e === "flash flood warning") return "blue";
+    if (e === "flood advisory") return "lightblue";
+    if (e === "flood warning") return "#3399cc";       // improved
+    if (e === "flood watch") return "green";
+    if (e === "heat advisory") return "#ffcc66";        // improved
+    if (e === "red flag warning") return "pink";
 
-  return "#999";
-}
-
-
-
+    return "#999"; // fallback
+  }
 
   function fetchWeatherAlerts() {
     if (!countyGeoJSON) return;
@@ -161,7 +163,8 @@
                   <em>${p.areaDesc}</em><br/>
                   <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
                   <span>${p.headline}</span><br/>
-                  <small>Expires: ${new Date(p.expires).toLocaleString()}</small>
+                  <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
+                  <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
                 </div>`;
               }).join("");
 
@@ -192,7 +195,8 @@
                 layer.bindPopup(`
                   <strong>${alert.properties.event}</strong><br/>
                   ${alert.properties.headline}<br/>
-                  <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small>
+                  <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small><br/>
+                  <a class="alert-link" href="${alert.properties['@id']}" target="_blank">View Alert</a>
                 `);
               }
             }).addTo(alertLayerGroup);
