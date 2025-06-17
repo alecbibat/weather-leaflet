@@ -194,24 +194,28 @@
   // --- FIRMS GeoJSON Layer with Clickable Dots ---
   const firmsLayerGroup = L.layerGroup();
 
-  document.getElementById('toggle-firms').addEventListener('change', e => {
-    if (e.target.checked) {
-      if (firmsLayerGroup.getLayers().length === 0) {
-        fetch('https://firms.modaps.eosdis.nasa.gov/data/active_fire/viirs/geojson/VIIRS_I_SNPP_NRT_USA_contiguous_and_Hawaii_24h.geojson')
-          .then(res => res.json())
-          .then(data => {
-            const layer = L.geoJSON(data, {
-              pointToLayer: (feature, latlng) => {
-                return L.circleMarker(latlng, {
-                  radius: 4,
-                  fillColor: "red",
-                  color: "#800",
-                  weight: 1,
-                  opacity: 1,
-                  fillOpacity: 0.7
-                });
-              },
-              onEachFeature: (feature, layer) => {
+document.getElementById('toggle-firms').addEventListener('change', e => {
+  if (e.target.checked) {
+    if (firmsLayerGroup.getLayers().length === 0) {
+      fetch('https://firms.modaps.eosdis.nasa.gov/data/active_fire/viirs/geojson/VIIRS_I_SNPP_NRT_USA_contiguous_and_Hawaii_24h.geojson')
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to fetch FIRMS GeoJSON");
+          return res.json();
+        })
+        .then(data => {
+          const layer = L.geoJSON(data, {
+            pointToLayer: (feature, latlng) => {
+              return L.circleMarker(latlng, {
+                radius: 4,
+                fillColor: "red",
+                color: "#800",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.7
+              });
+            },
+            onEachFeature: (feature, layer) => {
+              try {
                 const lat = feature.geometry.coordinates[1];
                 const lon = feature.geometry.coordinates[0];
                 const link = `https://firms.modaps.eosdis.nasa.gov/map/#d:2024-01-01..2024-12-31;l:${lat},${lon},10z`;
@@ -221,17 +225,24 @@
                   Lon: ${lon.toFixed(3)}<br/>
                   <a href="${link}" target="_blank">View on FIRMS</a>
                 `);
+              } catch (err) {
+                console.error("Failed to bind popup:", err);
               }
-            });
-            firmsLayerGroup.addLayer(layer).addTo(map);
+            }
           });
-      } else {
-        map.addLayer(firmsLayerGroup);
-      }
+          firmsLayerGroup.addLayer(layer).addTo(map);
+        })
+        .catch(err => {
+          console.error("FIRMS fetch failed:", err);
+        });
     } else {
-      map.removeLayer(firmsLayerGroup);
+      map.addLayer(firmsLayerGroup);
     }
-  });
+  } else {
+    map.removeLayer(firmsLayerGroup);
+  }
+});
+
 </script>
 </body>
 </html>
