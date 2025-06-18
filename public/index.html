@@ -3,56 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Weather Dashboard</title>
+  <title>Radar + NWS Alerts + FIRMS Fires</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.10/css/weather-icons.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.10/css/weather-icons.min.css" />
   <style>
-    html, body, #map {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      font-family: 'Roboto', sans-serif;
-    }
-
-    #navbar {
-      background-color: #222;
-      color: white;
-      padding: 12px 20px;
-      font-size: 20px;
-      font-weight: bold;
-      font-family: 'Roboto', sans-serif;
-    }
-
+    html, body, #map { height: 100%; margin: 0; padding: 0; font-family: Roboto, sans-serif; }
     #controls, #alerts {
-      position: absolute;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
+      position: absolute; z-index: 1000;
+      background: white; padding: 10px;
       border-radius: 6px;
-      font-family: 'Roboto', sans-serif;
-      font-size: 13px;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+      font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
-
-    #controls {
-      top: 60px;
-      right: 10px;
-      width: 200px;
-    }
-
+    #controls { top: 10px; right: 10px; width: 200px; }
     #alerts {
-      top: 60px;
-      left: 10px;
-      height: calc(100% - 70px);
+      top: 10px; left: 10px;
+      height: calc(100% - 20px);
       width: 300px;
       overflow-y: auto;
     }
-
-    label {
-      margin-top: 5px;
-      display: block;
-    }
+    label { margin-top: 5px; display: block; }
 
     .alert-card {
       border: 1px solid #ccc;
@@ -61,7 +30,6 @@
       background-color: #f9f9f9;
       cursor: pointer;
     }
-
     .alert-card-header {
       font-size: 24px;
       color: white;
@@ -71,26 +39,15 @@
       align-items: center;
       font-weight: bold;
     }
-
     .alert-card-header i {
       font-size: 30px;
       margin-right: 10px;
     }
-
     .alert-card-body {
-      padding: 10px;
+      padding: 8px 10px;
     }
-
-    .alert-card-body em {
-      font-style: italic;
-      color: #555;
-    }
-
-    .alert-card-body small {
-      display: block;
-      color: #777;
-    }
-
+    .alert-card em { font-style: italic; color: #555; display: block; }
+    .alert-card small { display: block; color: #777; }
     .alert-link {
       color: #0077cc;
       text-decoration: underline;
@@ -106,8 +63,6 @@
   </style>
 </head>
 <body>
-
-<div id="navbar">Weather Dashboard</div>
 
 <div id="controls">
   <label><input type="checkbox" id="toggle-radar" checked /> Radar</label>
@@ -127,12 +82,10 @@
   const map = L.map('map').setView([37.8, -96], 5);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors',
-    maxZoom: 19
+    attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
   const radarGroup = L.layerGroup().addTo(map);
-  const alertLayerGroup = L.layerGroup().addTo(map);
   let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
 
   function startRadar() {
@@ -143,6 +96,8 @@
       frameIndex = (frameIndex + 1) % radarLayers.length;
     }, 333);
   }
+
+  function stopRadar() { clearInterval(radarInterval); }
 
   fetch("https://api.rainviewer.com/public/weather-maps.json")
     .then(res => res.json())
@@ -165,46 +120,30 @@
     });
 
   document.getElementById('toggle-radar').addEventListener('change', e => {
-    if (e.target.checked) {
-      map.addLayer(radarGroup);
-    } else {
-      map.removeLayer(radarGroup);
-    }
+    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
   });
 
-  // ALERTS
+  const alertLayerGroup = L.layerGroup().addTo(map);
+  let countyGeo = null;
   const ALERT_API = "https://api.weather.gov/alerts/active";
   const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
-  let countyGeo = null;
-
-  const alertColorMap = {
-    "extreme heat": "red",
-    "severe thunderstorm warning": "orange",
-    "flash flood warning": "blue",
-    "flood advisory": "lightblue",
-    "flood warning": "#3399cc",
-    "flood watch": "green",
-    "heat advisory": "#ffcc66",
-    "red flag warning": "pink",
-    "tornado warning": "#990000"
-  };
-
-  const alertIconMap = {
-    "flood": "wi wi-flood",
-    "extreme heat": "wi wi-hot",
-    "severe thunderstorm": "wi wi-thunderstorm",
-    "tornado": "wi wi-tornado"
-  };
-
-  let alertFeatureMap = new Map();
 
   function getAlertColor(event) {
-    return alertColorMap[event.toLowerCase()] || "#999";
+    const e = event.toLowerCase();
+    if (e.includes("tornado")) return "purple";
+    if (e.includes("extreme heat")) return "red";
+    if (e.includes("severe thunderstorm")) return "orange";
+    if (e.includes("flood")) return "#3399cc";
+    return "#666";
   }
 
   function getAlertIcon(event) {
-    const key = Object.keys(alertIconMap).find(k => event.toLowerCase().includes(k));
-    return alertIconMap[key] || "wi wi-na";
+    const e = event.toLowerCase();
+    if (e.includes("tornado")) return "wi-tornado";
+    if (e.includes("extreme heat")) return "wi-hot";
+    if (e.includes("severe thunderstorm")) return "wi-lightning";
+    if (e.includes("flood")) return "wi-flood";
+    return "wi-alert";
   }
 
   function fetchWeatherAlerts() {
@@ -217,58 +156,64 @@
         const alerts = data.features.filter(f => {
           const p = f.properties;
           return new Date(p.expires).getTime() > now &&
-            p.event.toLowerCase() !== "special weather statement";
+                 p.event.toLowerCase() !== "special weather statement";
         });
 
-        alertLayerGroup.clearLayers();
-        document.getElementById("alertFeed").innerHTML = "";
+        document.getElementById("alertFeed").innerHTML = alerts.length === 0
+          ? "<p>No active alerts.</p>"
+          : alerts.map((f, i) => {
+              const p = f.properties;
+              const color = getAlertColor(p.event);
+              const icon = getAlertIcon(p.event);
+              return `<div class="alert-card" onclick="zoomToAlert(${i})">
+                <div class="alert-card-header" style="background:${color}">
+                  <i class="wi ${icon}"></i> ${p.event}
+                </div>
+                <div class="alert-card-body">
+                  <em>${p.areaDesc}</em>
+                  <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
+                  <span>${p.headline}</span>
+                  <small>Expires: ${new Date(p.expires).toLocaleString()}</small>
+                  <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
+                </div>
+              </div>`;
+            }).join("");
 
-        alerts.forEach((alert, idx) => {
+        alertLayerGroup.clearLayers();
+        window.alertFeatures = [];
+
+        alerts.forEach((alert, i) => {
           const codes = alert.properties.geocode?.SAME || [];
           const fipsList = codes.map(c => c.length === 6 ? c.slice(1) : c);
           const matchingFeatures = countyGeo.features.filter(f => fipsList.includes(f.id));
-
-          if (!matchingFeatures.length) return;
-
-          const color = getAlertColor(alert.properties.event);
-          const iconClass = getAlertIcon(alert.properties.event);
-          const alertId = "alert_" + idx;
-
-          const layer = L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
-            style: {
-              color,
-              weight: 2,
-              opacity: 0.8,
-              fillOpacity: 0.1
-            }
-          }).addTo(alertLayerGroup);
-
-          alertFeatureMap.set(alertId, layer);
-
-          const card = document.createElement("div");
-          card.className = "alert-card";
-          card.id = alertId;
-          card.innerHTML = `
-            <div class="alert-card-header" style="background-color: ${color}">
-              <i class="${iconClass}"></i>${alert.properties.event}
-            </div>
-            <div class="alert-card-body">
-              <em>${alert.properties.areaDesc}</em><br/>
-              <span style="color:gray;">${alert.properties.severity} - ${alert.properties.urgency}</span><br/>
-              <span>${alert.properties.headline}</span><br/>
-              <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small><br/>
-              <a class="alert-link" href="${alert.properties['@id']}" target="_blank">View Alert</a>
-            </div>
-          `;
-
-          card.addEventListener("click", () => {
-            const bounds = layer.getBounds();
-            map.fitBounds(bounds);
-          });
-
-          document.getElementById("alertFeed").appendChild(card);
+          if (matchingFeatures.length) {
+            const geoLayer = L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
+              style: {
+                color: getAlertColor(alert.properties.event),
+                weight: 2, opacity: 0.8, fillOpacity: 0.1
+              },
+              onEachFeature: (feature, layer) => {
+                layer.bindPopup(`
+                  <strong>${alert.properties.event}</strong><br/>
+                  ${alert.properties.headline}<br/>
+                  <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small><br/>
+                  <a class="alert-link" href="${alert.properties['@id']}" target="_blank">View Alert</a>
+                `);
+              }
+            });
+            alertFeatures[i] = geoLayer;
+            geoLayer.addTo(alertLayerGroup);
+          }
         });
       });
+  }
+
+  function zoomToAlert(index) {
+    const layer = window.alertFeatures[index];
+    if (layer) {
+      const bounds = layer.getBounds();
+      map.fitBounds(bounds, { maxZoom: 8 });
+    }
   }
 
   fetch(COUNTY_GEOJSON)
@@ -280,14 +225,9 @@
     });
 
   document.getElementById('toggle-alerts').addEventListener('change', e => {
-    if (e.target.checked) {
-      map.addLayer(alertLayerGroup);
-    } else {
-      map.removeLayer(alertLayerGroup);
-    }
+    e.target.checked ? map.addLayer(alertLayerGroup) : map.removeLayer(alertLayerGroup);
   });
 
-  // FIRMS Fires
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
