@@ -5,15 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Radar + NWS Alerts + FIRMS Fires</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.10/css/weather-icons.min.css" />
-  <link href="https://fonts.googleapis.com/css?family=Roboto:400,500,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
     #controls, #alerts {
       position: absolute; z-index: 1000;
       background: white; padding: 10px;
-      border-radius: 6px;
-      font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      border-radius: 6px; font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
     #controls { top: 10px; right: 10px; width: 200px; }
     #alerts {
@@ -23,27 +22,27 @@
       overflow-y: auto;
     }
     label { margin-top: 5px; display: block; }
+    .alert-link {
+      color: #0077cc;
+      text-decoration: underline;
+      font-size: 12px;
+    }
     .alert-card {
       border: 1px solid #ccc;
       border-radius: 6px;
+      padding: 8px;
       margin-bottom: 10px;
       background-color: #f9f9f9;
-      overflow: hidden;
+      cursor: pointer;
     }
     .alert-card-header {
-      padding: 8px 12px;
-      font-weight: 500;
-      font-size: 1.1em;
-      color: white;
+      font-size: 1.65em;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
     .alert-card-header i {
-      font-size: 24px;
-    }
-    .alert-card-body {
-      padding: 8px 12px;
+      font-size: 36px;
     }
     .alert-card em {
       font-style: italic;
@@ -52,11 +51,6 @@
     .alert-card small {
       display: block;
       color: #777;
-    }
-    .alert-link {
-      color: #0077cc;
-      text-decoration: underline;
-      font-size: 12px;
     }
     .leaflet-control-zoom {
       bottom: 10px !important;
@@ -84,14 +78,12 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   const map = L.map('map').setView([37.8, -96], 5);
-
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
   const radarGroup = L.layerGroup().addTo(map);
   let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
-
   function startRadar() {
     radarInterval = setInterval(() => {
       radarLayers.forEach((layer, i) => {
@@ -100,7 +92,6 @@
       frameIndex = (frameIndex + 1) % radarLayers.length;
     }, 333);
   }
-
   function stopRadar() { clearInterval(radarInterval); }
 
   fetch("https://api.rainviewer.com/public/weather-maps.json")
@@ -124,43 +115,45 @@
     });
 
   document.getElementById('toggle-radar').addEventListener('change', e => {
-    if (e.target.checked) {
-      map.addLayer(radarGroup);
-    } else {
-      map.removeLayer(radarGroup);
-    }
+    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
   });
 
   const alertLayerGroup = L.layerGroup().addTo(map);
   let countyGeo = null;
   const ALERT_API = "https://api.weather.gov/alerts/active";
   const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
+  const alertPolygons = {};
 
   function getAlertColor(event) {
     const e = event.toLowerCase();
-    if (e.includes("tornado")) return "#990000";
-    if (e.includes("fire")) return "#cc3300";
-    if (e.includes("heat")) return "#e67300";
-    if (e.includes("flood")) return "#3399cc";
-    if (e.includes("storm") || e.includes("thunderstorm")) return "#6666cc";
-    if (e.includes("watch")) return "green";
-    if (e.includes("advisory")) return "#ffcc66";
-    return "#888";
+    if (e.includes("tornado")) return "purple";
+    if (e.includes("thunderstorm")) return "orange";
+    if (e.includes("flood")) return "blue";
+    if (e.includes("heat")) return "red";
+    if (e.includes("winter")) return "gray";
+    if (e.includes("fire") || e.includes("red flag")) return "pink";
+    return "#999";
   }
 
-  function getAlertIconClass(event) {
+  function getAlertIcon(event) {
     const e = event.toLowerCase();
-    if (e.includes("tornado")) return "wi wi-tornado";
-    if (e.includes("fire")) return "wi wi-hot";
-    if (e.includes("heat")) return "wi wi-thermometer";
-    if (e.includes("flood")) return "wi wi-flood";
-    if (e.includes("storm") || e.includes("thunderstorm")) return "wi wi-storm-showers";
-    return "wi wi-alert";
+    if (e.includes("tornado")) return "🌪️";
+    if (e.includes("thunderstorm")) return "⛈️";
+    if (e.includes("flood")) return "🌊";
+    if (e.includes("heat")) return "🔥";
+    if (e.includes("winter")) return "❄️";
+    if (e.includes("fire")) return "🔥";
+    return "⚠️";
+  }
+
+  function zoomToAlert(alertId) {
+    if (alertPolygons[alertId]) {
+      map.fitBounds(alertPolygons[alertId]);
+    }
   }
 
   function fetchWeatherAlerts() {
     if (!countyGeo) return;
-
     fetch(ALERT_API)
       .then(res => res.json())
       .then(data => {
@@ -175,30 +168,24 @@
           ? "<p>No active alerts.</p>"
           : alerts.map(f => {
               const p = f.properties;
-              const color = getAlertColor(p.event);
-              const iconClass = getAlertIconClass(p.event);
-              return `<div class="alert-card">
-                <div class="alert-card-header" style="background-color:${color};">
-                  <i class="${iconClass}"></i> ${p.event}
-                </div>
-                <div class="alert-card-body">
-                  <em>${p.areaDesc}</em><br/>
-                  <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
-                  <span>${p.headline}</span><br/>
-                  <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
-                  <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
-                </div>
+              const icon = getAlertIcon(p.event);
+              return `<div class="alert-card" onclick="zoomToAlert('${f.id}')">
+                <div class="alert-card-header">${icon} ${p.event}</div>
+                <em>${p.areaDesc}</em><br/>
+                <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
+                <span>${p.headline}</span><br/>
+                <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
+                <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
               </div>`;
             }).join("");
 
         alertLayerGroup.clearLayers();
-
         alerts.forEach(alert => {
           const codes = alert.properties.geocode?.SAME || [];
           const fipsList = codes.map(c => c.length === 6 ? c.slice(1) : c);
           const matchingFeatures = countyGeo.features.filter(f => fipsList.includes(f.id));
           if (matchingFeatures.length) {
-            L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
+            const alertGeoJson = L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
               style: {
                 color: getAlertColor(alert.properties.event),
                 weight: 2, opacity: 0.8, fillOpacity: 0.1
@@ -212,6 +199,7 @@
                 `);
               }
             }).addTo(alertLayerGroup);
+            alertPolygons[alert.id] = alertGeoJson.getBounds();
           }
         });
       });
@@ -226,14 +214,9 @@
     });
 
   document.getElementById('toggle-alerts').addEventListener('change', e => {
-    if (e.target.checked) {
-      map.addLayer(alertLayerGroup);
-    } else {
-      map.removeLayer(alertLayerGroup);
-    }
+    e.target.checked ? map.addLayer(alertLayerGroup) : map.removeLayer(alertLayerGroup);
   });
 
-  // FIRMS Fires WMS
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
