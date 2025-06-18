@@ -42,10 +42,13 @@
       display: flex;
       align-items: center;
       font-size: 1.5em;
+      font-weight: bold;
     }
-    .alert-header i {
-      margin-right: 8px;
-      font-size: 1.5em;
+    .alert-icon {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
     }
     .alert-body {
       padding: 8px;
@@ -93,10 +96,6 @@
     }, 333);
   }
 
-  function stopRadar() {
-    clearInterval(radarInterval);
-  }
-
   fetch("https://api.rainviewer.com/public/weather-maps.json")
     .then(res => res.json())
     .then(data => {
@@ -118,11 +117,8 @@
     });
 
   document.getElementById('toggle-radar').addEventListener('change', e => {
-    if (e.target.checked) {
-      map.addLayer(radarGroup);
-    } else {
-      map.removeLayer(radarGroup);
-    }
+    if (e.target.checked) map.addLayer(radarGroup);
+    else map.removeLayer(radarGroup);
   });
 
   const alertLayerGroup = L.layerGroup().addTo(map);
@@ -141,15 +137,15 @@
     return "#666666";
   }
 
-  function getAlertIcon(event) {
+  function getMinimalIcon(event) {
     const e = event.toLowerCase();
-    if (e.includes("tornado")) return "🌪️";
-    if (e.includes("thunderstorm")) return "⛈️";
-    if (e.includes("flood")) return "🌊";
-    if (e.includes("heat")) return "🔥";
-    if (e.includes("fire")) return "🚒";
-    if (e.includes("wind")) return "🌬️";
-    return "⚠️";
+    if (e.includes("tornado")) return "🌀";
+    if (e.includes("thunderstorm")) return "⚡";
+    if (e.includes("flood")) return "💧";
+    if (e.includes("heat")) return "☀";
+    if (e.includes("fire")) return "🔥";
+    if (e.includes("wind")) return "🪁";
+    return "⚠";
   }
 
   let alertFeatures = [];
@@ -183,12 +179,12 @@
           const card = document.createElement("div");
           card.className = "alert-card";
           const headerColor = getAlertColor(alert.properties.event);
-          const icon = getAlertIcon(alert.properties.event);
+          const icon = getMinimalIcon(alert.properties.event);
 
           card.innerHTML = `
             <div class="alert-header" style="background-color:${headerColor};">
-              <span>${icon}</span>
-              <strong>${alert.properties.event}</strong>
+              <span class="alert-icon">${icon}</span>
+              ${alert.properties.event}
             </div>
             <div class="alert-body">
               <em>${alert.properties.areaDesc}</em><br/>
@@ -200,8 +196,7 @@
           `;
 
           card.addEventListener('click', () => {
-            const same = alert.properties.geocode?.SAME || [];
-            const fipsList = same.map(c => c.length === 6 ? c.slice(1) : c);
+            const fipsList = alert.properties.geocode?.SAME?.map(c => c.length === 6 ? c.slice(1) : c) || [];
             const target = alertFeatures.find(f => f.fipsList.some(fips => fipsList.includes(fips)));
             if (target) {
               map.fitBounds(target.layer.getBounds());
@@ -261,7 +256,6 @@
     }
   });
 
-  // FIRMS Fires WMS
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
