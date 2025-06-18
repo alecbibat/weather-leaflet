@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Radar + NWS Alerts + FIRMS Fires</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; font-family: 'Roboto', sans-serif; }
     #controls, #alerts {
       position: absolute; z-index: 1000;
       background: white; padding: 10px;
-      border-radius: 6px; font-size: 13px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      border-radius: 6px; font-family: 'Roboto', sans-serif;
+      font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     }
     #controls { top: 10px; right: 10px; width: 200px; }
     #alerts {
@@ -22,35 +22,36 @@
       overflow-y: auto;
     }
     label { margin-top: 5px; display: block; }
-    .alert-link {
-      color: #0077cc;
-      text-decoration: underline;
-      font-size: 12px;
-    }
     .alert-card {
       border: 1px solid #ccc;
       border-radius: 6px;
-      padding: 8px;
       margin-bottom: 10px;
       background-color: #f9f9f9;
       cursor: pointer;
     }
     .alert-card-header {
-      font-size: 1.65em;
       display: flex;
       align-items: center;
-      gap: 6px;
+      padding: 10px;
+      color: white;
+      font-size: 1.5em;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
     }
     .alert-card-header i {
+      margin-right: 8px;
       font-size: 36px;
     }
-    .alert-card em {
-      font-style: italic;
-      color: #555;
+    .alert-card-body {
+      padding: 8px;
+      font-size: 13px;
     }
-    .alert-card small {
-      display: block;
-      color: #777;
+    .alert-card-body em { color: #555; }
+    .alert-card-body small { color: #777; display: block; }
+    .alert-link {
+      color: #0077cc;
+      text-decoration: underline;
+      font-size: 12px;
     }
     .leaflet-control-zoom {
       bottom: 10px !important;
@@ -78,83 +79,48 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   const map = L.map('map').setView([37.8, -96], 5);
+  const alertLayerGroup = L.layerGroup().addTo(map);
+  let alertPolygons = [];
+
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
-  const radarGroup = L.layerGroup().addTo(map);
-  let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
-  function startRadar() {
-    radarInterval = setInterval(() => {
-      radarLayers.forEach((layer, i) => {
-        layer.setOpacity(i === frameIndex ? 0.6 : 0);
-      });
-      frameIndex = (frameIndex + 1) % radarLayers.length;
-    }, 333);
-  }
-  function stopRadar() { clearInterval(radarInterval); }
-
-  fetch("https://api.rainviewer.com/public/weather-maps.json")
-    .then(res => res.json())
-    .then(data => {
-      radarFrames = data.radar?.past || [];
-      let loaded = 0;
-      radarFrames.forEach(frame => {
-        const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-        const layer = L.tileLayer(url, { opacity: 0, zIndex: 10 });
-        layer.on('load', () => {
-          loaded++;
-          if (loaded === radarFrames.length) {
-            radarLayers[0].setOpacity(0.6);
-            if (playing) startRadar();
-          }
-        });
-        radarGroup.addLayer(layer);
-        radarLayers.push(layer);
-      });
-    });
-
-  document.getElementById('toggle-radar').addEventListener('change', e => {
-    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
-  });
-
-  const alertLayerGroup = L.layerGroup().addTo(map);
-  let countyGeo = null;
-  const ALERT_API = "https://api.weather.gov/alerts/active";
-  const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
-  const alertPolygons = {};
-
   function getAlertColor(event) {
     const e = event.toLowerCase();
-    if (e.includes("tornado")) return "purple";
-    if (e.includes("thunderstorm")) return "orange";
-    if (e.includes("flood")) return "blue";
-    if (e.includes("heat")) return "red";
-    if (e.includes("winter")) return "gray";
-    if (e.includes("fire") || e.includes("red flag")) return "pink";
-    return "#999";
+    if (e.includes("tornado")) return "#d00000";
+    if (e.includes("thunderstorm")) return "#ff9f1c";
+    if (e.includes("flood")) return "#2ec4b6";
+    if (e.includes("heat")) return "#ff6b6b";
+    if (e.includes("snow")) return "#1c77c3";
+    if (e.includes("fire") || e.includes("red flag")) return "#e71d36";
+    return "#666";
   }
 
   function getAlertIcon(event) {
     const e = event.toLowerCase();
-    if (e.includes("tornado")) return "🌪️";
-    if (e.includes("thunderstorm")) return "⛈️";
-    if (e.includes("flood")) return "🌊";
-    if (e.includes("heat")) return "🔥";
-    if (e.includes("winter")) return "❄️";
-    if (e.includes("fire")) return "🔥";
-    return "⚠️";
+    if (e.includes("tornado")) return "fa-solid fa-wind";
+    if (e.includes("thunderstorm")) return "fa-solid fa-cloud-bolt";
+    if (e.includes("flood")) return "fa-solid fa-water";
+    if (e.includes("heat")) return "fa-solid fa-temperature-high";
+    if (e.includes("snow")) return "fa-solid fa-snowflake";
+    if (e.includes("fire") || e.includes("red flag")) return "fa-solid fa-fire";
+    return "fa-solid fa-triangle-exclamation";
   }
 
-  function zoomToAlert(alertId) {
-    if (alertPolygons[alertId]) {
-      map.fitBounds(alertPolygons[alertId]);
-    }
-  }
+  const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
+  let countyGeo = null;
+  fetch(COUNTY_GEOJSON)
+    .then(res => res.json())
+    .then(data => {
+      countyGeo = data;
+      fetchWeatherAlerts();
+      setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
+    });
 
   function fetchWeatherAlerts() {
     if (!countyGeo) return;
-    fetch(ALERT_API)
+    fetch("https://api.weather.gov/alerts/active")
       .then(res => res.json())
       .then(data => {
         const now = Date.now();
@@ -166,26 +132,34 @@
 
         document.getElementById("alertFeed").innerHTML = alerts.length === 0
           ? "<p>No active alerts.</p>"
-          : alerts.map(f => {
+          : alerts.map((f, i) => {
               const p = f.properties;
+              const color = getAlertColor(p.event);
               const icon = getAlertIcon(p.event);
-              return `<div class="alert-card" onclick="zoomToAlert('${f.id}')">
-                <div class="alert-card-header">${icon} ${p.event}</div>
-                <em>${p.areaDesc}</em><br/>
-                <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
-                <span>${p.headline}</span><br/>
-                <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
-                <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
-              </div>`;
+              return `
+                <div class="alert-card" onclick="zoomToAlert(${i})">
+                  <div class="alert-card-header" style="background:${color};">
+                    <i class="${icon}"></i> ${p.event}
+                  </div>
+                  <div class="alert-card-body">
+                    <em>${p.areaDesc}</em><br/>
+                    <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
+                    <span>${p.headline}</span><br/>
+                    <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
+                    <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
+                  </div>
+                </div>`;
             }).join("");
 
         alertLayerGroup.clearLayers();
-        alerts.forEach(alert => {
+        alertPolygons = [];
+
+        alerts.forEach((alert, i) => {
           const codes = alert.properties.geocode?.SAME || [];
           const fipsList = codes.map(c => c.length === 6 ? c.slice(1) : c);
           const matchingFeatures = countyGeo.features.filter(f => fipsList.includes(f.id));
           if (matchingFeatures.length) {
-            const alertGeoJson = L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
+            const layer = L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
               style: {
                 color: getAlertColor(alert.properties.event),
                 weight: 2, opacity: 0.8, fillOpacity: 0.1
@@ -198,25 +172,61 @@
                   <a class="alert-link" href="${alert.properties['@id']}" target="_blank">View Alert</a>
                 `);
               }
-            }).addTo(alertLayerGroup);
-            alertPolygons[alert.id] = alertGeoJson.getBounds();
+            });
+            alertLayerGroup.addLayer(layer);
+            alertPolygons[i] = layer;
           }
         });
       });
   }
 
-  fetch(COUNTY_GEOJSON)
+  function zoomToAlert(index) {
+    const layer = alertPolygons[index];
+    if (layer) {
+      map.fitBounds(layer.getBounds());
+    }
+  }
+
+  // Radar toggle
+  const radarGroup = L.layerGroup().addTo(map);
+  let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
+  fetch("https://api.rainviewer.com/public/weather-maps.json")
     .then(res => res.json())
     .then(data => {
-      countyGeo = data;
-      fetchWeatherAlerts();
-      setInterval(fetchWeatherAlerts, 5 * 60 * 1000);
+      radarFrames = data.radar?.past || [];
+      let loaded = 0;
+      radarFrames.forEach(frame => {
+        const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+        const layer = L.tileLayer(url, { opacity: 0, zIndex: 10 });
+        layer.on('load', () => {
+          loaded++;
+          if (loaded === radarFrames.length) {
+            radarLayers[0].setOpacity(0.6);
+            if (playing) {
+              radarInterval = setInterval(() => {
+                radarLayers.forEach((l, i) => {
+                  l.setOpacity(i === frameIndex ? 0.6 : 0);
+                });
+                frameIndex = (frameIndex + 1) % radarLayers.length;
+              }, 333);
+            }
+          }
+        });
+        radarGroup.addLayer(layer);
+        radarLayers.push(layer);
+      });
     });
 
+  document.getElementById('toggle-radar').addEventListener('change', e => {
+    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
+  });
+
+  // Alerts toggle
   document.getElementById('toggle-alerts').addEventListener('change', e => {
     e.target.checked ? map.addLayer(alertLayerGroup) : map.removeLayer(alertLayerGroup);
   });
 
+  // FIRMS Fires toggle
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
@@ -230,10 +240,8 @@
         });
       }
       firmsLayer.addTo(map);
-    } else {
-      if (firmsLayer) {
-        map.removeLayer(firmsLayer);
-      }
+    } else if (firmsLayer) {
+      map.removeLayer(firmsLayer);
     }
   });
 </script>
