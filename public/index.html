@@ -5,53 +5,124 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Radar + NWS Alerts + FIRMS Fires</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.10/css/weather-icons.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.10/css/weather-icons.min.css">
   <style>
-    html, body, #map { height: 100%; margin: 0; padding: 0; font-family: Roboto, sans-serif; }
-    #controls, #alerts {
-      position: absolute; z-index: 1000;
-      background: white; padding: 10px;
-      border-radius: 6px;
-      font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      font-family: Roboto, sans-serif;
     }
-    #controls { top: 10px; right: 10px; width: 200px; }
+
+    #navbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 50px;
+      background-color: #2c3e50;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 2000;
+    }
+
+    .nav-title {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    #utcClock {
+      font-size: 14px;
+      font-family: monospace;
+    }
+
+    #darkModeToggle {
+      background: none;
+      color: white;
+      border: 1px solid white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    #map {
+      height: calc(100% - 50px);
+      width: 100%;
+      position: absolute;
+      top: 50px;
+      left: 0;
+    }
+
+    #controls, #alerts {
+      position: absolute;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    #controls {
+      top: 70px;
+      right: 10px;
+      width: 200px;
+    }
+
     #alerts {
-      top: 10px; left: 10px;
-      height: calc(100% - 20px);
+      top: 70px;
+      left: 10px;
+      height: calc(100% - 80px);
       width: 300px;
       overflow-y: auto;
     }
-    label { margin-top: 5px; display: block; }
+
+    label {
+      margin-top: 5px;
+      display: block;
+    }
+
+    .alert-link {
+      color: #0077cc;
+      text-decoration: underline;
+      font-size: 12px;
+    }
 
     .alert-card {
       border: 1px solid #ccc;
       border-radius: 6px;
       margin-bottom: 10px;
       background-color: #f9f9f9;
+      overflow: hidden;
       cursor: pointer;
     }
-    .alert-card-header {
-      font-size: 24px;
-      color: white;
-      padding: 8px 10px;
-      border-radius: 4px 4px 0 0;
+
+    .alert-header {
       display: flex;
       align-items: center;
+      padding: 6px 10px;
+      font-size: 18px;
       font-weight: bold;
+      color: white;
     }
-    .alert-card-header i {
-      font-size: 30px;
+
+    .alert-header i {
       margin-right: 10px;
+      font-size: 24px;
     }
-    .alert-card-body {
+
+    .alert-body {
       padding: 8px 10px;
-    }
-    .alert-card em { font-style: italic; color: #555; display: block; }
-    .alert-card small { display: block; color: #777; }
-    .alert-link {
-      color: #0077cc;
-      text-decoration: underline;
-      font-size: 12px;
+      font-size: 13px;
+      color: #333;
     }
 
     .leaflet-control-zoom {
@@ -60,9 +131,33 @@
       right: 10px !important;
       left: auto !important;
     }
+
+    /* Dark mode */
+    body.dark-mode {
+      background-color: #1c1c1c;
+      color: white;
+    }
+
+    body.dark-mode #controls, body.dark-mode #alerts {
+      background-color: #2b2b2b;
+      color: white;
+    }
+
+    body.dark-mode .alert-card {
+      background-color: #333;
+      border-color: #444;
+    }
   </style>
 </head>
 <body>
+
+<div id="navbar">
+  <div class="nav-title">Weather Dashboard</div>
+  <div class="nav-right">
+    <div id="utcClock">--:--:-- UTC</div>
+    <button id="darkModeToggle">Dark Mode</button>
+  </div>
+</div>
 
 <div id="controls">
   <label><input type="checkbox" id="toggle-radar" checked /> Radar</label>
@@ -85,6 +180,20 @@
     attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
   }).addTo(map);
 
+  // Live UTC clock
+  function updateClock() {
+    const now = new Date();
+    document.getElementById("utcClock").textContent = now.toUTCString().split(' ')[4] + ' UTC';
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Dark mode toggle
+  document.getElementById("darkModeToggle").addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+  });
+
+  // Radar
   const radarGroup = L.layerGroup().addTo(map);
   let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
 
@@ -96,8 +205,6 @@
       frameIndex = (frameIndex + 1) % radarLayers.length;
     }, 333);
   }
-
-  function stopRadar() { clearInterval(radarInterval); }
 
   fetch("https://api.rainviewer.com/public/weather-maps.json")
     .then(res => res.json())
@@ -111,7 +218,7 @@
           loaded++;
           if (loaded === radarFrames.length) {
             radarLayers[0].setOpacity(0.6);
-            if (playing) startRadar();
+            startRadar();
           }
         });
         radarGroup.addLayer(layer);
@@ -120,30 +227,32 @@
     });
 
   document.getElementById('toggle-radar').addEventListener('change', e => {
-    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
+    map[e.target.checked ? 'addLayer' : 'removeLayer'](radarGroup);
   });
 
+  // Alerts
   const alertLayerGroup = L.layerGroup().addTo(map);
   let countyGeo = null;
   const ALERT_API = "https://api.weather.gov/alerts/active";
   const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
 
+  const iconMap = {
+    "flood": "wi wi-flood",
+    "extreme heat": "wi wi-hot",
+    "severe thunderstorm": "wi wi-storm-showers",
+    "tornado": "wi wi-tornado"
+  };
+
+  const colorMap = {
+    "flood": "#3498db",
+    "extreme heat": "#e67e22",
+    "severe thunderstorm": "#f1c40f",
+    "tornado": "#c0392b"
+  };
+
   function getAlertColor(event) {
     const e = event.toLowerCase();
-    if (e.includes("tornado")) return "purple";
-    if (e.includes("extreme heat")) return "red";
-    if (e.includes("severe thunderstorm")) return "orange";
-    if (e.includes("flood")) return "#3399cc";
-    return "#666";
-  }
-
-  function getAlertIcon(event) {
-    const e = event.toLowerCase();
-    if (e.includes("tornado")) return "wi-tornado";
-    if (e.includes("extreme heat")) return "wi-hot";
-    if (e.includes("severe thunderstorm")) return "wi-lightning";
-    if (e.includes("flood")) return "wi-flood";
-    return "wi-alert";
+    return colorMap[e] || "#666";
   }
 
   function fetchWeatherAlerts() {
@@ -159,61 +268,63 @@
                  p.event.toLowerCase() !== "special weather statement";
         });
 
-        document.getElementById("alertFeed").innerHTML = alerts.length === 0
-          ? "<p>No active alerts.</p>"
-          : alerts.map((f, i) => {
-              const p = f.properties;
-              const color = getAlertColor(p.event);
-              const icon = getAlertIcon(p.event);
-              return `<div class="alert-card" onclick="zoomToAlert(${i})">
-                <div class="alert-card-header" style="background:${color}">
-                  <i class="wi ${icon}"></i> ${p.event}
-                </div>
-                <div class="alert-card-body">
-                  <em>${p.areaDesc}</em>
-                  <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
-                  <span>${p.headline}</span>
-                  <small>Expires: ${new Date(p.expires).toLocaleString()}</small>
-                  <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
-                </div>
-              </div>`;
-            }).join("");
+        const alertFeed = document.getElementById("alertFeed");
+        alertFeed.innerHTML = "";
 
         alertLayerGroup.clearLayers();
-        window.alertFeatures = [];
 
         alerts.forEach((alert, i) => {
-          const codes = alert.properties.geocode?.SAME || [];
+          const p = alert.properties;
+          const event = p.event;
+          const lowerEvent = event.toLowerCase();
+          const color = getAlertColor(event);
+          const iconClass = iconMap[lowerEvent] || "wi wi-na";
+
+          // Build card
+          const card = document.createElement("div");
+          card.className = "alert-card";
+          card.innerHTML = `
+            <div class="alert-header" style="background:${color}">
+              <i class="${iconClass}"></i>${event}
+            </div>
+            <div class="alert-body">
+              <em>${p.areaDesc}</em><br/>
+              <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
+              <span>${p.headline}</span><br/>
+              <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
+              <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
+            </div>
+          `;
+          alertFeed.appendChild(card);
+
+          const codes = p.geocode?.SAME || [];
           const fipsList = codes.map(c => c.length === 6 ? c.slice(1) : c);
           const matchingFeatures = countyGeo.features.filter(f => fipsList.includes(f.id));
+
           if (matchingFeatures.length) {
             const geoLayer = L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
               style: {
-                color: getAlertColor(alert.properties.event),
-                weight: 2, opacity: 0.8, fillOpacity: 0.1
+                color,
+                weight: 2,
+                opacity: 0.8,
+                fillOpacity: 0.1
               },
               onEachFeature: (feature, layer) => {
                 layer.bindPopup(`
-                  <strong>${alert.properties.event}</strong><br/>
-                  ${alert.properties.headline}<br/>
-                  <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small><br/>
-                  <a class="alert-link" href="${alert.properties['@id']}" target="_blank">View Alert</a>
+                  <strong>${p.event}</strong><br/>
+                  ${p.headline}<br/>
+                  <small>Expires: ${new Date(p.expires).toLocaleString()}</small><br/>
+                  <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
                 `);
               }
+            }).addTo(alertLayerGroup);
+
+            card.addEventListener("click", () => {
+              map.fitBounds(geoLayer.getBounds());
             });
-            alertFeatures[i] = geoLayer;
-            geoLayer.addTo(alertLayerGroup);
           }
         });
       });
-  }
-
-  function zoomToAlert(index) {
-    const layer = window.alertFeatures[index];
-    if (layer) {
-      const bounds = layer.getBounds();
-      map.fitBounds(bounds, { maxZoom: 8 });
-    }
   }
 
   fetch(COUNTY_GEOJSON)
@@ -225,9 +336,10 @@
     });
 
   document.getElementById('toggle-alerts').addEventListener('change', e => {
-    e.target.checked ? map.addLayer(alertLayerGroup) : map.removeLayer(alertLayerGroup);
+    map[e.target.checked ? 'addLayer' : 'removeLayer'](alertLayerGroup);
   });
 
+  // FIRMS Fires WMS
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
