@@ -33,22 +33,24 @@
       background-color: #f9f9f9;
       overflow: hidden;
     }
-    .alert-header {
+    .alert-card-header {
+      padding: 6px 8px;
       font-weight: bold;
-      padding: 6px 10px;
       color: white;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
     }
-    .alert-header.flood { background-color: #3399cc; }
-    .alert-header.storm { background-color: orange; }
-    .alert-header.heat { background-color: red; }
-    .alert-header.fire { background-color: pink; color: black; }
-    .alert-header.tornado { background-color: purple; }
-    .alert-header.default { background-color: #777; }
-    .alert-body {
-      padding: 8px 10px;
+    .alert-card-body {
+      padding: 8px;
+    }
+    .alert-card em {
+      font-style: italic;
+      color: #555;
+    }
+    .alert-card small {
+      display: block;
+      color: #777;
     }
     .leaflet-control-zoom {
       bottom: 10px !important;
@@ -96,6 +98,10 @@
     }, 333);
   }
 
+  function stopRadar() {
+    clearInterval(radarInterval);
+  }
+
   fetch("https://api.rainviewer.com/public/weather-maps.json")
     .then(res => res.json())
     .then(data => {
@@ -117,7 +123,11 @@
     });
 
   document.getElementById('toggle-radar').addEventListener('change', e => {
-    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
+    if (e.target.checked) {
+      map.addLayer(radarGroup);
+    } else {
+      map.removeLayer(radarGroup);
+    }
   });
 
   const alertLayerGroup = L.layerGroup().addTo(map);
@@ -125,14 +135,24 @@
   const ALERT_API = "https://api.weather.gov/alerts/active";
   const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
 
-  function classifyAlertType(event) {
+  function getAlertColor(event) {
     const e = event.toLowerCase();
-    if (e.includes("flood")) return "flood";
-    if (e.includes("storm")) return "storm";
-    if (e.includes("heat")) return "heat";
-    if (e.includes("red flag") || e.includes("fire")) return "fire";
-    if (e.includes("tornado")) return "tornado";
-    return "default";
+    if (e.includes("tornado")) return "#990000";
+    if (e.includes("extreme heat") || e.includes("heat advisory")) return "#e68a00";
+    if (e.includes("fire")) return "#cc3300";
+    if (e.includes("flood")) return "#3366cc";
+    if (e.includes("storm")) return "#9933ff";
+    return "#666";
+  }
+
+  function getAlertIcon(event) {
+    const e = event.toLowerCase();
+    if (e.includes("tornado")) return "🌪️";
+    if (e.includes("fire")) return "🔥";
+    if (e.includes("heat")) return "🌡️";
+    if (e.includes("flood")) return "🌊";
+    if (e.includes("storm")) return "⛈️";
+    return "⚠️";
   }
 
   function fetchWeatherAlerts() {
@@ -152,12 +172,13 @@
           ? "<p>No active alerts.</p>"
           : alerts.map(f => {
               const p = f.properties;
-              const type = classifyAlertType(p.event);
+              const icon = getAlertIcon(p.event);
+              const bgColor = getAlertColor(p.event);
               return `<div class="alert-card">
-                <div class="alert-header ${type}">
-                  <span>⚠️</span> ${p.event}
+                <div class="alert-card-header" style="background-color: ${bgColor};">
+                  ${icon} ${p.event}
                 </div>
-                <div class="alert-body">
+                <div class="alert-card-body">
                   <em>${p.areaDesc}</em><br/>
                   <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
                   <span>${p.headline}</span><br/>
@@ -176,7 +197,7 @@
           if (matchingFeatures.length) {
             L.geoJSON({ type: "FeatureCollection", features: matchingFeatures }, {
               style: {
-                color: "#999",
+                color: getAlertColor(alert.properties.event),
                 weight: 2, opacity: 0.8, fillOpacity: 0.1
               },
               onEachFeature: (feature, layer) => {
@@ -202,9 +223,14 @@
     });
 
   document.getElementById('toggle-alerts').addEventListener('change', e => {
-    e.target.checked ? map.addLayer(alertLayerGroup) : map.removeLayer(alertLayerGroup);
+    if (e.target.checked) {
+      map.addLayer(alertLayerGroup);
+    } else {
+      map.removeLayer(alertLayerGroup);
+    }
   });
 
+  // FIRMS Fires WMS
   let firmsLayer = null;
   document.getElementById('toggle-firms').addEventListener('change', e => {
     if (e.target.checked) {
