@@ -155,11 +155,20 @@
       .then(res => res.json())
       .then(data => {
         const now = Date.now();
-        const alerts = data.features.filter(f => {
-          const p = f.properties;
-          return new Date(p.expires).getTime() > now &&
-                 p.event.toLowerCase() !== "special weather statement";
-        });
+        const excludedEvents = [
+  "test message",
+  "small craft advisory",
+  "heat advisory",
+  "special weather statement"
+];
+
+const alerts = data.features.filter(f => {
+  const p = f.properties;
+  const eventLower = p.event.toLowerCase();
+  return new Date(p.expires).getTime() > now &&
+         !excludedEvents.includes(eventLower);
+});
+
 
         document.getElementById("alertFeed").innerHTML = alerts.length === 0
           ? "<p>No active alerts.</p>"
