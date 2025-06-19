@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Radar + NWS Alerts + FIRMS Fires + Lightning</title>
+  <title>Radar + NWS Alerts + FIRMS Fires</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.10/css/weather-icons.min.css" />
   <style>
@@ -21,14 +21,6 @@
       width: 300px;
       overflow-y: auto;
     }
-    #lightning-overlay {
-      position: absolute;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      z-index: 500;
-      border: none;
-      pointer-events: none;
-    }
     label { margin-top: 5px; display: block; }
 
     .alert-card {
@@ -39,21 +31,23 @@
       cursor: pointer;
     }
     .alert-card-header {
-      font-size: 19px;
-      color: white;
+  font-size: 19px; /* was 24px */
+  color: white;
+  padding: 8px 10px;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+}
+
+.alert-card-header i {
+  font-size: 24px; /* was 30px */
+  margin-right: 10px;
+}
+
+    .alert-card-body {
       padding: 8px 10px;
-      border-radius: 4px 4px 0 0;
-      display: flex;
-      align-items: center;
-      font-weight: bold;
     }
-
-    .alert-card-header i {
-      font-size: 24px;
-      margin-right: 10px;
-    }
-
-    .alert-card-body { padding: 8px 10px; }
     .alert-card em { font-style: italic; color: #555; display: block; }
     .alert-card small { display: block; color: #777; }
     .alert-link {
@@ -84,10 +78,6 @@
 </div>
 
 <div id="map"></div>
-
-<iframe id="lightning-overlay"
-  src="https://map.blitzortung.org/?interactive=0&zoom=5&lat=37.8&lon=-96&map=0&icons=0&anim=1&alert=0">
-</iframe>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -166,17 +156,25 @@
       .then(data => {
         const now = Date.now();
         const excludedEvents = [
-          "test message", "small craft advisory", "heat advisory", "special weather statement",
-          "special marine warning", "air quality alert", "flood advisory",
-          "wind advisory", "beach hazards statement", "dense fog advisory"
-        ];
+  "test message",
+  "small craft advisory",
+  "heat advisory",
+  "special weather statement",
+  "special marine warning",
+  "air quality alert",
+  "flood advisory",
+  "wind advisory",
+  "beach hazards statement",
+  "dense fog advisory"
+];
 
-        const alerts = data.features.filter(f => {
-          const p = f.properties;
-          const eventLower = p.event.toLowerCase();
-          return new Date(p.expires).getTime() > now &&
-                 !excludedEvents.includes(eventLower);
-        });
+const alerts = data.features.filter(f => {
+  const p = f.properties;
+  const eventLower = p.event.toLowerCase();
+  return new Date(p.expires).getTime() > now &&
+         !excludedEvents.includes(eventLower);
+});
+
 
         document.getElementById("alertFeed").innerHTML = alerts.length === 0
           ? "<p>No active alerts.</p>"
@@ -265,14 +263,6 @@
         map.removeLayer(firmsLayer);
       }
     }
-  });
-
-  // Sync map view with lightning overlay
-  map.on('moveend zoomend', () => {
-    const center = map.getCenter();
-    const zoom = map.getZoom();
-    const lightning = document.getElementById('lightning-overlay');
-    lightning.src = `https://map.blitzortung.org/?interactive=0&zoom=${zoom}&lat=${center.lat.toFixed(4)}&lon=${center.lng.toFixed(4)}&map=0&icons=0&anim=1&alert=0`;
   });
 </script>
 </body>
