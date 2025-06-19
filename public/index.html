@@ -37,7 +37,7 @@
       background: white; padding: 10px;
       border-radius: 6px;
       font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-      margin-top: 45px; /* offset for navbar */
+      margin-top: 45px;
     }
 
     #controls { top: 10px; right: 10px; width: 200px; }
@@ -115,7 +115,8 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([37.8, -96], 5);
+    const map = L.map('map', { zoomControl: false }).setView([37.8, -96], 5);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
