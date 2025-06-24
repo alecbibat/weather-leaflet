@@ -193,7 +193,7 @@
             const p = f.properties;
             const eventLower = p.event.toLowerCase();
             return new Date(p.expires).getTime() > now &&
-              !excludedEvents.includes(eventLower);
+              !excludedEvents.some(term => eventLower.includes(term));
           });
 
           document.getElementById("alertFeed").innerHTML = alerts.length === 0
