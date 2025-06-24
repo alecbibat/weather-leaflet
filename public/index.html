@@ -31,19 +31,23 @@
       cursor: pointer;
     }
     .alert-card-header {
-      font-size: 19px;
-      color: white;
+  font-size: 19px; /* was 24px */
+  color: white;
+  padding: 8px 10px;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: center;
+  font-weight: bold;
+}
+
+.alert-card-header i {
+  font-size: 24px; /* was 30px */
+  margin-right: 10px;
+}
+
+    .alert-card-body {
       padding: 8px 10px;
-      border-radius: 4px 4px 0 0;
-      display: flex;
-      align-items: center;
-      font-weight: bold;
     }
-    .alert-card-header i {
-      font-size: 24px;
-      margin-right: 10px;
-    }
-    .alert-card-body { padding: 8px 10px; }
     .alert-card em { font-style: italic; color: #555; display: block; }
     .alert-card small { display: block; color: #777; }
     .alert-link {
@@ -152,19 +156,25 @@
       .then(data => {
         const now = Date.now();
         const excludedEvents = [
-          "test message", "small craft advisory", "heat advisory",
-          "special weather statement", "special marine warning",
-          "air quality alert", "flood advisory", "wind advisory",
-          "beach hazards statement", "dense fog advisory"
-        ];
+  "test message",
+  "small craft advisory",
+  "heat advisory",
+  "special weather statement",
+  "special marine warning",
+  "air quality alert",
+  "flood advisory",
+  "wind advisory",
+  "beach hazards statement",
+  "dense fog advisory"
+];
 
-        const alerts = data.features.filter(f => {
-          const p = f.properties;
-          const eventLower = p.event.toLowerCase().trim();
-          const isExact = excludedEvents.includes(eventLower);
-          const isPartial = excludedEvents.some(term => eventLower.startsWith(term + " "));
-          return new Date(p.expires).getTime() > now && !isExact && !isPartial;
-        });
+const alerts = data.features.filter(f => {
+  const p = f.properties;
+  const eventLower = p.event.toLowerCase();
+  return new Date(p.expires).getTime() > now &&
+         !excludedEvents.includes(eventLower);
+});
+
 
         document.getElementById("alertFeed").innerHTML = alerts.length === 0
           ? "<p>No active alerts.</p>"
