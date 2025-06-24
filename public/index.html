@@ -167,11 +167,11 @@
 
 function getAlertColor(event) {
   const e = event.toLowerCase();
-  if (e.includes("flash flood warning")) return "#00008b";  // Navy
-  if (e.includes("flood warning")) return "#0047ab";        // Royal Blue
-  if (e.includes("flood watch")) return "#3399cc";          // Medium Teal Blue
-  if (e.includes("flood advisory")) return "#87ceeb";       // Sky Blue
-  if (e.includes("coastal flood advisory")) return "#add8e6"; // Light Blue
+  if (e.includes("flash flood warning")) return "#ff69b4";     // Hot Pink
+  if (e.includes("flood warning")) return "#0047ab";           // Royal Blue
+  if (e.includes("flood watch")) return "#3399cc";             // Teal Blue
+  if (e.includes("flood advisory")) return "#87ceeb";          // Sky Blue
+  if (e.includes("coastal flood advisory")) return "#add8e6";  // Light Blue
   if (e.includes("tornado")) return "purple";
   if (e.includes("extreme heat")) return "red";
   if (e.includes("severe thunderstorm")) return "orange";
