@@ -165,14 +165,18 @@
     const ALERT_API = "https://api.weather.gov/alerts/active";
     const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
 
-    function getAlertColor(event) {
-      const e = event.toLowerCase();
-      if (e.includes("tornado")) return "purple";
-      if (e.includes("extreme heat")) return "red";
-      if (e.includes("severe thunderstorm")) return "orange";
-      if (e.includes("flood")) return "#3399cc";
-      return "#666";
-    }
+function getAlertColor(event) {
+  const e = event.toLowerCase();
+  if (e.includes("flash flood warning")) return "#00008b";       // Dark Blue
+  if (e.includes("flood warning")) return "#1e90ff";              // Dodger Blue
+  if (e.includes("flood watch")) return "#3399cc";                // Medium Blue
+  if (e.includes("flood advisory")) return "#87ceeb";             // Sky Blue
+  if (e.includes("coastal flood advisory")) return "#add8e6";     // Light Blue
+  if (e.includes("tornado")) return "purple";
+  if (e.includes("extreme heat")) return "red";
+  if (e.includes("severe thunderstorm")) return "orange";
+  return "#666";
+}
 
     function getAlertIcon(event) {
       const e = event.toLowerCase();
