@@ -169,53 +169,69 @@
     });
 
     // ===== EONET InciWeb Fires =====
-    const eonetLayerGroup = L.layerGroup().addTo(map);
-overlayMaps["InciWeb Fires"] = eonetLayerGroup;
+    // ========== InciWeb RSS Integration (Client-side with proxy) ==========
+const inciwebLayerGroup = L.layerGroup().addTo(map);
+overlayMaps["InciWeb (RSS)"] = inciwebLayerGroup;
 
-fetch("https://eonet.gsfc.nasa.gov/api/v3/events/geojson?source=InciWeb")
-  .then(res => res.json())
-  .then(data => {
-    console.log("EONET InciWeb GeoJSON:", data);
+// Add toggle checkbox
+const rssToggle = document.createElement("label");
+rssToggle.innerHTML = '<input type="checkbox" id="toggle-inciweb" checked /> InciWeb RSS';
+document.getElementById("controls").appendChild(rssToggle);
+document.getElementById("toggle-inciweb").addEventListener("change", e => {
+  e.target.checked ? map.addLayer(inciwebLayerGroup) : map.removeLayer(inciwebLayerGroup);
+});
 
-    if (!data.features || data.features.length === 0) {
-      console.warn("No EONET InciWeb features found.");
-      return;
+// Fetch and parse the InciWeb RSS feed
+fetch("https://cors-anywhere.herokuapp.com/https://inciweb.wildfire.gov/incidents/rss.xml")
+  .then(res => res.text())
+  .then(str => new window.DOMParser().parseFromString(str, "text/xml"))
+  .then(parseRSS)
+  .catch(err => console.error("Failed to fetch or parse InciWeb RSS feed:", err));
+
+function parseRSS(xml) {
+  const items = Array.from(xml.querySelectorAll("item"));
+  const markers = [];
+
+  items.forEach(item => {
+    const title = item.querySelector("title")?.textContent || "No Title";
+    const description = item.querySelector("description")?.textContent || "";
+    let lat = item.querySelector("geo\\:lat, lat")?.textContent;
+    let lon = item.querySelector("geo\\:long, long")?.textContent;
+
+    // Try to extract coordinates from description if not in geo tags
+    if ((!lat || !lon) && description) {
+      const match = description.match(/Lat(?:itude)?:\\s*([\\d.-]+).*?Lon(?:gitude)?:\\s*([\\d.-]+)/i);
+      if (match) {
+        lat = match[1];
+        lon = match[2];
+      }
     }
 
-    const wildfireLayer = L.geoJSON(data, {
-      pointToLayer: function (feature, latlng) {
-        return L.circleMarker(latlng, {
-          radius: 6,
-          fillColor: "#ff6600",
-          color: "#000",
-          weight: 1,
-          opacity: 1,
-          fillOpacity: 0.8
-        }).bindPopup(
-          `<strong>${feature.properties.title}</strong><br>${feature.properties.description || "No description"}`
-        );
-      }
-    });
-
-    wildfireLayer.addTo(eonetLayerGroup);
-
-    const bounds = wildfireLayer.getBounds();
-    if (bounds.isValid()) map.fitBounds(bounds);
-  })
-  .catch(err => {
-    console.error("Failed to fetch EONET InciWeb data:", err);
+    if (lat && lon) {
+      const marker = L.circleMarker([+lat, +lon], {
+        radius: 6,
+        fillColor: "#b22222",
+        color: "#000",
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.8
+      }).bindPopup(
+        `<strong>${title}</strong><br>${description}`
+      );
+      marker.addTo(inciwebLayerGroup);
+      markers.push(marker);
+    }
   });
 
-// Add checkbox to controls if it doesn’t exist already
-if (!document.getElementById("toggle-eonet")) {
-  const eonetToggle = document.createElement("label");
-  eonetToggle.innerHTML = '<input type="checkbox" id="toggle-eonet" checked /> InciWeb Fires';
-  document.getElementById("controls").appendChild(eonetToggle);
-
-  document.getElementById("toggle-eonet").addEventListener("change", e => {
-    e.target.checked ? map.addLayer(eonetLayerGroup) : map.removeLayer(eonetLayerGroup);
-  });
+  if (markers.length) {
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds());
+    console.log(`Plotted ${markers.length} InciWeb incidents.`);
+  } else {
+    console.warn("No valid geocoded incidents found in InciWeb RSS feed.");
+  }
 }
+
 
 
     // ===== NWS Alerts =====
