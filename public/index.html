@@ -25,16 +25,7 @@
       top: 10px; left: 10px; height: calc(100% - 60px); width: 300px;
       overflow-y: auto;
     }
-    .alert-card { border: 1px solid #ccc; border-radius: 6px; margin-bottom: 10px; background-color: #f9f9f9; cursor: pointer; }
-    .alert-card-header {
-      font-size: 19px; color: white; padding: 8px 10px;
-      border-radius: 4px 4px 0 0; display: flex; align-items: center; font-weight: bold;
-    }
-    .alert-card-header i { font-size: 24px; margin-right: 10px; }
-    .alert-card-body { padding: 8px 10px; }
-    .alert-card em { font-style: italic; color: #555; display: block; }
-    .alert-card small { display: block; color: #777; }
-    .alert-link { color: #0077cc; text-decoration: underline; font-size: 12px; }
+    label { margin-top: 5px; display: block; }
     .leaflet-control-zoom {
       bottom: 10px !important; top: auto !important;
       right: 10px !important; left: auto !important;
@@ -42,118 +33,188 @@
   </style>
 </head>
 <body>
-  <nav id="navbar">
-    <div id="nav-title">Denver GSOC Weather Monitoring</div>
-    <div id="clock"></div>
-  </nav>
 
-  <div id="controls">
-    <label><input type="checkbox" id="toggle-radar" checked /> Radar</label>
-    <label><input type="checkbox" id="toggle-alerts" checked /> NWS Alerts</label>
-    <label><input type="checkbox" id="toggle-firms" /> FIRMS Fires</label>
-  </div>
+<nav id="navbar">
+  <div id="nav-title">Denver GSOC Weather Monitoring</div>
+  <div id="clock"></div>
+</nav>
 
-  <div id="alerts">
-    <strong>Live Weather Alerts (Active Only)</strong>
-    <div id="alertFeed">Loading...</div>
-  </div>
+<div id="controls">
+  <label><input type="checkbox" id="toggle-radar" checked /> Radar</label>
+  <label><input type="checkbox" id="toggle-alerts" checked /> NWS Alerts</label>
+  <label><input type="checkbox" id="toggle-firms" /> FIRMS Fires</label>
+</div>
 
-  <div id="map"></div>
+<div id="alerts">
+  <strong>Live Weather Alerts (Active Only)</strong>
+  <div id="alertFeed">Loading...</div>
+</div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    const map = L.map('map', { zoomControl: false }).setView([37.8, -96], 5);
-    L.control.zoom({ position: 'bottomright' }).addTo(map);
+<div id="map"></div>
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
-    }).addTo(map);
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  const map = L.map('map', { zoomControl: false }).setView([37.8, -96], 5);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    const radarGroup = L.layerGroup().addTo(map);
-    let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
+  const overlayMaps = {};
+  const radarGroup = L.layerGroup().addTo(map);
+  overlayMaps["Radar"] = radarGroup;
 
-    function startRadar() {
-      radarInterval = setInterval(() => {
-        radarLayers.forEach((layer, i) => {
-          layer.setOpacity(i === frameIndex ? 0.6 : 0);
-        });
-        frameIndex = (frameIndex + 1) % radarLayers.length;
-      }, 333);
-    }
-
-    function stopRadar() { clearInterval(radarInterval); }
-
-    fetch("https://api.rainviewer.com/public/weather-maps.json")
-      .then(res => res.json())
-      .then(data => {
-        radarFrames = data.radar?.past || [];
-        let loaded = 0;
-        radarFrames.forEach(frame => {
-          const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
-          const layer = L.tileLayer(url, { opacity: 0, zIndex: 10 });
-          layer.on('load', () => {
-            loaded++;
-            if (loaded === radarFrames.length) {
-              radarLayers[0].setOpacity(0.6);
-              if (playing) startRadar();
-            }
-          });
-          radarGroup.addLayer(layer);
-          radarLayers.push(layer);
-        });
-      });
-
-    document.getElementById('toggle-radar').addEventListener('change', e => {
-      e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
-    });
-
-    // EONET Wildfire Layer
-    const eonetURL = "https://eonet.gsfc.nasa.gov/api/v3/events/geojson?source=InciWeb";
-    const eonetLayerGroup = L.layerGroup().addTo(map);
-
-    fetch(eonetURL)
-      .then(res => res.json())
-      .then(data => {
-        const wildfireFeatures = data.features.filter(f =>
-          f.properties.categories.some(c => c.title.toLowerCase() === "wildfires")
-        );
-        const geojson = {
-          type: "FeatureCollection",
-          features: wildfireFeatures
-        };
-
-        const wildfireLayer = L.geoJSON(geojson, {
-          pointToLayer: function (feature, latlng) {
-            return L.circleMarker(latlng, {
-              radius: 6,
-              fillColor: "#e25822",
-              color: "#000",
-              weight: 1,
-              opacity: 1,
-              fillOpacity: 0.8
-            }).bindPopup(
-              `<strong>${feature.properties.title}</strong><br>${feature.properties.description || "No description"}`
-            );
+  let radarFrames = [], radarLayers = [], frameIndex = 0, radarInterval, playing = true;
+  fetch("https://api.rainviewer.com/public/weather-maps.json")
+    .then(res => res.json())
+    .then(data => {
+      radarFrames = data.radar?.past || [];
+      let loaded = 0;
+      radarFrames.forEach(frame => {
+        const url = `https://tilecache.rainviewer.com/v2/radar/${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+        const layer = L.tileLayer(url, { opacity: 0, zIndex: 10 });
+        layer.on('load', () => {
+          loaded++;
+          if (loaded === radarFrames.length) {
+            radarLayers[0].setOpacity(0.6);
+            startRadar();
           }
         });
-
-        eonetLayerGroup.addLayer(wildfireLayer);
-      })
-      .catch(err => {
-        console.error("EONET Wildfire Fetch Error:", err);
+        radarGroup.addLayer(layer);
+        radarLayers.push(layer);
       });
-
-    // Add EONET toggle control
-    const eonetToggle = document.createElement("label");
-    eonetToggle.innerHTML = '<input type="checkbox" id="toggle-eonet" checked /> InciWeb Fires';
-    document.getElementById("controls").appendChild(eonetToggle);
-
-    document.getElementById("toggle-eonet").addEventListener("change", e => {
-      e.target.checked ? map.addLayer(eonetLayerGroup) : map.removeLayer(eonetLayerGroup);
     });
 
-    // Existing other layers and functions omitted here to save space.
-    // You should reinsert the rest of your weather alert, FIRMS, and clock logic as-is.
-  </script>
+  function startRadar() {
+    radarInterval = setInterval(() => {
+      radarLayers.forEach((layer, i) => {
+        layer.setOpacity(i === frameIndex ? 0.6 : 0);
+      });
+      frameIndex = (frameIndex + 1) % radarLayers.length;
+    }, 333);
+  }
+
+  document.getElementById('toggle-radar').addEventListener('change', e => {
+    e.target.checked ? map.addLayer(radarGroup) : map.removeLayer(radarGroup);
+  });
+
+  const alertLayerGroup = L.layerGroup().addTo(map);
+  overlayMaps["NWS Alerts"] = alertLayerGroup;
+
+  let countyGeo = null;
+  const ALERT_API = "https://api.weather.gov/alerts/active";
+  const COUNTY_GEOJSON = "https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json";
+
+  function getAlertColor(event) {
+    const e = event.toLowerCase();
+    if (e.includes("flash flood warning")) return "#ff69b4";
+    if (e.includes("flood warning")) return "#0047ab";
+    if (e.includes("flood watch")) return "#3399cc";
+    if (e.includes("flood advisory")) return "#87ceeb";
+    if (e.includes("coastal flood advisory")) return "#add8e6";
+    if (e.includes("tornado")) return "purple";
+    if (e.includes("extreme heat")) return "red";
+    if (e.includes("severe thunderstorm")) return "orange";
+    return "#666";
+  }
+
+  function fetchWeatherAlerts() {
+    if (!countyGeo) return;
+    fetch(ALERT_API)
+      .then(res => res.json())
+      .then(data => {
+        const now = Date.now();
+        const alerts = data.features.filter(f => {
+          const p = f.properties;
+          const eventLower = p.event.toLowerCase();
+          return new Date(p.expires).getTime() > now &&
+            !["test message", "heat advisory", "small craft advisory"].includes(eventLower);
+        });
+
+        alertLayerGroup.clearLayers();
+        alerts.forEach(alert => {
+          const codes = alert.properties.geocode?.SAME || [];
+          const fipsList = codes.map(c => c.length === 6 ? c.slice(1) : c);
+          const matches = countyGeo.features.filter(f => fipsList.includes(f.id));
+          if (matches.length) {
+            const layer = L.geoJSON({ type: "FeatureCollection", features: matches }, {
+              style: {
+                color: getAlertColor(alert.properties.event),
+                weight: 2, fillOpacity: 0.1
+              }
+            });
+            layer.addTo(alertLayerGroup);
+          }
+        });
+      });
+  }
+
+  fetch(COUNTY_GEOJSON)
+    .then(res => res.json())
+    .then(data => {
+      countyGeo = data;
+      fetchWeatherAlerts();
+      setInterval(fetchWeatherAlerts, 300000);
+    });
+
+  document.getElementById('toggle-alerts').addEventListener('change', e => {
+    e.target.checked ? map.addLayer(alertLayerGroup) : map.removeLayer(alertLayerGroup);
+  });
+
+  let firmsLayer = L.tileLayer.wms(
+    'https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires?MAP_KEY=98816b6dadda86b7a77d0477889142db', {
+    layers: 'fires_viirs_24',
+    format: 'image/png',
+    transparent: true,
+    attribution: 'NASA FIRMS'
+  });
+  overlayMaps["FIRMS Fires"] = firmsLayer;
+
+  document.getElementById('toggle-firms').addEventListener('change', e => {
+    e.target.checked ? map.addLayer(firmsLayer) : map.removeLayer(firmsLayer);
+  });
+
+  // EONET Wildfire Integration
+  const eonetLayerGroup = L.layerGroup();
+  fetch("https://eonet.gsfc.nasa.gov/api/v3/events/geojson?source=InciWeb")
+    .then(res => res.json())
+    .then(data => {
+      const features = data.features.filter(f =>
+        f.properties.categories.some(c => c.title.toLowerCase() === "wildfires")
+      );
+      const geo = { type: "FeatureCollection", features };
+      const layer = L.geoJSON(geo, {
+        pointToLayer: (f, latlng) => L.circleMarker(latlng, {
+          radius: 6, fillColor: "#e25822", color: "#000",
+          weight: 1, opacity: 1, fillOpacity: 0.8
+        }).bindPopup(`<strong>${f.properties.title}</strong><br>${f.properties.description || ""}`)
+      });
+      eonetLayerGroup.addLayer(layer);
+      eonetLayerGroup.addTo(map);
+      overlayMaps["InciWeb Fires"] = eonetLayerGroup;
+    });
+
+  const eonetToggle = document.createElement("label");
+  eonetToggle.innerHTML = '<input type="checkbox" id="toggle-eonet" checked /> InciWeb Fires';
+  document.getElementById("controls").appendChild(eonetToggle);
+  document.getElementById("toggle-eonet").addEventListener("change", e => {
+    e.target.checked ? map.addLayer(eonetLayerGroup) : map.removeLayer(eonetLayerGroup);
+  });
+
+  L.control.layers(null, overlayMaps).addTo(map);
+
+  // Mountain Time Clock
+  function updateClock() {
+    const now = new Date();
+    const options = {
+      timeZone: "America/Denver",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true
+    };
+    document.getElementById("clock").textContent =
+      new Intl.DateTimeFormat("en-US", options).format(now);
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+</script>
 </body>
 </html>
