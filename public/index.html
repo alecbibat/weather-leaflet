@@ -169,36 +169,51 @@
     });
 
     // ===== EONET InciWeb Fires =====
-    const eonetLayerGroup = L.layerGroup();
-    overlayMaps["InciWeb Fires"] = eonetLayerGroup;
+    const eonetLayerGroup = L.layerGroup().addTo(map);
+overlayMaps["InciWeb Fires"] = eonetLayerGroup;
 
-    fetch("https://eonet.gsfc.nasa.gov/api/v3/events/geojson?source=InciWeb")
-      .then(res => res.json())
-      .then(data => {
-        const features = data.features.filter(f =>
-          f.properties.categories.some(c => c.title.toLowerCase() === "wildfires")
+fetch("https://eonet.gsfc.nasa.gov/api/v3/events/geojson?source=InciWeb")
+  .then(res => res.json())
+  .then(data => {
+    console.log("EONET raw response:", data);
+
+    const wildfireFeatures = data.features.filter(f =>
+      f.properties.categories.some(c => c.title.toLowerCase() === "wildfires")
+    );
+
+    console.log("Filtered wildfire features:", wildfireFeatures);
+
+    if (wildfireFeatures.length === 0) {
+      console.warn("No active InciWeb wildfire features found.");
+      return;
+    }
+
+    const wildfireLayer = L.geoJSON({ type: "FeatureCollection", features: wildfireFeatures }, {
+      pointToLayer: function (feature, latlng) {
+        return L.circleMarker(latlng, {
+          radius: 6,
+          fillColor: "#e25822",
+          color: "#000",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8
+        }).bindPopup(
+          `<strong>${feature.properties.title}</strong><br>${feature.properties.description || "No details"}`
         );
-        const geo = { type: "FeatureCollection", features };
-        const layer = L.geoJSON(geo, {
-          pointToLayer: (f, latlng) => L.circleMarker(latlng, {
-            radius: 6,
-            fillColor: "#e25822",
-            color: "#000",
-            weight: 1,
-            opacity: 1,
-            fillOpacity: 0.8
-          }).bindPopup(`<strong>${f.properties.title}</strong><br>${f.properties.description || ""}`)
-        });
-        eonetLayerGroup.addLayer(layer);
-        eonetLayerGroup.addTo(map);
-      });
-
-    const eonetToggle = document.createElement("label");
-    eonetToggle.innerHTML = '<input type="checkbox" id="toggle-eonet" checked /> InciWeb Fires';
-    document.getElementById("controls").appendChild(eonetToggle);
-    document.getElementById("toggle-eonet").addEventListener("change", e => {
-      e.target.checked ? map.addLayer(eonetLayerGroup) : map.removeLayer(eonetLayerGroup);
+      }
     });
+
+    wildfireLayer.addTo(eonetLayerGroup);
+
+    // Optional: zoom to bounds of EONET layer
+    const bounds = wildfireLayer.getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds);
+
+  })
+  .catch(err => {
+    console.error("Failed to fetch or parse EONET InciWeb fires:", err);
+  });
+
     // ===== NWS Alerts =====
     const alertLayerGroup = L.layerGroup().addTo(map);
     overlayMaps["NWS Alerts"] = alertLayerGroup;
