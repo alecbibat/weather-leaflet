@@ -374,5 +374,31 @@ function parseRSS(xml) {
     // ===== Add Leaflet Layer Control =====
     L.control.layers(null, overlayMaps).addTo(map);
   </script>
+
+<script>
+  // Sample data: Replace or expand this array with your own lat/lon and popup text
+  const pinLocations = [
+    { lat: 36.45306, lon: -116.85892, text: "Death Valley, Furnace Creek" },
+    { lat: 36.05637, lon: -112.12802, text: "Grand Canyon South Rim" },
+    { lat: 35.25116, lon: -112.19109, text: "Grand Canyon Railway" },
+    { lat: 39.60302, lon: -104.89372, text: "Corporate Office" },
+    { lat: 40.44151, lon: -105.75372, text: "Rocky Mountain, Trail Ridge Store" },
+    { lat: 44.71988, lon: -110.59728, text: "Yellowstone National Park" },
+    { lat: 48.71511, lon: -113.71273, text: "Glacier National Park" },
+    { lat: 43.87615, lon: -103.45453, text: "Mount Rushmore" },
+    { lat: 44.79087, lon: -91.46265, text: "Holiday Vacations Office" },
+    { lat: 44.46109, lon: -73.12280, text: "Vermont Bike Tours Office" },
+    { lat: 25.80901, lon: -80.33307, text: "Windstar Office" }
+  ];
+
+  // Add each marker to the map
+  pinLocations.forEach(loc => {
+    L.marker([loc.lat, loc.lon])
+      .addTo(map)
+      .bindPopup(loc.text); // You can use .openPopup() to show by default
+  });
+</script>
+
+
 </body>
 </html>
