@@ -168,18 +168,7 @@
       e.target.checked ? map.addLayer(firmsLayer) : map.removeLayer(firmsLayer);
     });
 
-    // ===== EONET InciWeb Fires =====
-    // ========== InciWeb RSS Integration (Client-side with proxy) ==========
-const inciwebLayerGroup = L.layerGroup().addTo(map);
-overlayMaps["InciWeb (RSS)"] = inciwebLayerGroup;
 
-// Add toggle checkbox
-const rssToggle = document.createElement("label");
-rssToggle.innerHTML = '<input type="checkbox" id="toggle-inciweb" checked /> InciWeb RSS';
-document.getElementById("controls").appendChild(rssToggle);
-document.getElementById("toggle-inciweb").addEventListener("change", e => {
-  e.target.checked ? map.addLayer(inciwebLayerGroup) : map.removeLayer(inciwebLayerGroup);
-});
 
 // Fetch and parse the InciWeb RSS feed
 fetch("https://cors-anywhere.herokuapp.com/https://inciweb.wildfire.gov/incidents/rss.xml")
