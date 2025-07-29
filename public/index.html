@@ -290,7 +290,9 @@ function parseRSS(xml) {
                   <span style="color:gray;">${p.severity} - ${p.urgency}</span><br/>
                   <span>${p.headline}</span>
                   <small>Expires: ${new Date(p.expires).toLocaleString()}</small>
-                  <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a>
+                  <a class="alert-link" href="${p['@id']}" target="_blank">View Alert</a><br/>
+<a class="alert-link" href="https://forecast.weather.gov/wwamap/wwatxtget.php?cwa=usa&wwa=${encodeURIComponent(p.event)}" target="_blank">WWA Text</a>
+
                 </div>
               </div>`;
             }).join("");
