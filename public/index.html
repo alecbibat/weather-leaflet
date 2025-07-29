@@ -311,13 +311,17 @@ function parseRSS(xml) {
                   weight: 2, opacity: 0.8, fillOpacity: 0.1
                 },
                 onEachFeature: (feature, layer) => {
-                 layer.bindPopup(`
+    const cwa = alert.properties.areaCWA || 'usa'; // fallback
+const encodedEvent = encodeURIComponent(alert.properties.event);
+
+layer.bindPopup(`
   <strong>${alert.properties.event}</strong><br/>
   ${alert.properties.headline}<br/>
   <small>Expires: ${new Date(alert.properties.expires).toLocaleString()}</small><br/>
   <a class="alert-link" href="${alert.properties['@id']}" target="_blank">View Alert</a><br/>
-  <a class="alert-link" href="https://forecast.weather.gov/wwamap/wwatxtget.php?cwa=usa&wwa=${encodeURIComponent(alert.properties.event)}" target="_blank">WWA Text</a>
+  <a class="alert-link" href="https://forecast.weather.gov/wwamap/wwatxtget.php?cwa=${cwa}&wwa=${encodedEvent}" target="_blank">WWA Text</a>
 `);
+
 
                 }
               });
