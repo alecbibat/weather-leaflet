@@ -98,6 +98,7 @@
     <label><input type="checkbox" id="toggle-radar" checked /> Radar</label>
     <label><input type="checkbox" id="toggle-alerts" checked /> NWS Alerts</label>
     <label><input type="checkbox" id="toggle-firms" /> FIRMS Fires</label>
+    <label><input type="checkbox" id="toggle-sat" /> Satellite View</label>
   </div>
 
   <div id="alerts">
@@ -111,9 +112,33 @@
     const map = L.map('map', { zoomControl: false }).setView([37.8, -96], 5);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
-    }).addTo(map);
+// Base layers
+const baseOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+}).addTo(map);
+
+const baseSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+  maxZoom: 19
+});
+
+function setSatellite(on) {
+  if (on) {
+    if (map.hasLayer(baseOSM)) map.removeLayer(baseOSM);
+    if (!map.hasLayer(baseSat)) baseSat.addTo(map);
+  } else {
+    if (map.hasLayer(baseSat)) map.removeLayer(baseSat);
+    if (!map.hasLayer(baseOSM)) baseOSM.addTo(map);
+  }
+}
+
+// Wire up the checkbox
+document.addEventListener('DOMContentLoaded', () => {
+  const satToggle = document.getElementById('toggle-sat');
+  if (satToggle) {
+    satToggle.addEventListener('change', (e) => setSatellite(e.target.checked));
+  }
+});
 
     const overlayMaps = {};
     const radarGroup = L.layerGroup().addTo(map);
